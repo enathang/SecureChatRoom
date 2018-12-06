@@ -5,6 +5,7 @@ from Crypto.Signature import pkcs1_15
 from Crypto.Hash import SHA256
 
 import json
+import sys
 
 
 shared_secret = -1
@@ -12,7 +13,7 @@ USER_MODE = "RSA"
 counter = 0
 address = "A";
 
-
+'''
 def connect():
 	msg = establishConnection()
 	server_msg = send(msg)
@@ -38,11 +39,7 @@ def read():
 				plaintext = msg.decode("utf-8")
 
 
-def sign(message, private_key):
-	h = SHA256.new(message)
-	signature = pkcs1_15.new(private_key).sign(h)
 
-	return signature
 
 
 def mac(msg, counter):
@@ -94,7 +91,12 @@ def dropConnection():
 	signature = pkcs1_15.new(private_key).sign(h)
 
 	return message+signature
+'''
+def sign(message, private_key):
+	h = SHA256.new(message)
+	signature = pkcs1_15.new(private_key).sign(h)
 
+	return signature
 
 def encrypt_AES(message, key):
 	cipher_aes = AES.new(key, AES.MODE_EAX)
@@ -124,15 +126,15 @@ def generateSharedSecretDict(users_publickeys, session_key):
 		user_key = user_publickey
 		cipher_rsa = PKCS1_OAEP.new(user_key)
 		enc_session_key = cipher_rsa.encrypt(session_key)
-		secrets_dict[user_publickey.export_key()] = enc_session_key
+		secrets_dict[str(user_publickey.export_key())] = str(enc_session_key)
 
 	return secrets_dict
 
 
 def verifySignature(message, signature, key):
-	h = SHA.new(message)
+	h = SHA256.new(message)
 	try:
-	    pkcs1_15.new(key).verify(h, signature):
+	    pkcs1_15.new(key).verify(h, signature)
 	    #print "The signature is valid."
 	    return True
 	except (ValueError, TypeError):
@@ -172,32 +174,35 @@ def establishSharedSecret(users_publickeys):
 	secret_dictionary = generateSharedSecretDict(users_publickeys, session_key)
 	json_secret_dictionary = json.dumps(secret_dictionary)
 	
-	return session_key, secret_dictionary
+	return session_key, json_secret_dictionary
 
 
 ''' HIGH LEVEL API '''
+signature_length = 256
+def receiveAndParseMessage(message):
+	msg_type = int(message[0:1].decode('ascii'))
+	msg_address = message[1:2].decode('ascii')
+	msg_content = json.loads(message[3:-signature_length].decode('ascii'))
+	print(msg_content)
+	signature = message[-signature_length:]
 
-def receiveMessage(message):
-	msg_type = message[0]
-	msg_address = message[1]
-	msg_length = message[2]
-	msg_content = message[3:3+msg_length]
-	signature = message[3+msg_length:]
+	isValidSignature = verifySignature(message[0:-signature_length], signature, public_key) # shoud be address
+	if (not isValidSignature):
+		return False
 
-	isValidSignature = verifySignature(msg_type+msg_address+msg_length+msg_content, signature, msg_address)
-
-	msg_type = message[0]
-	if (msg_type == 0):
+	if (msg_type == 1):
 		parseJoinMessage(message)
-	else if (msg_type == 1):
+	elif (msg_type == 2):
 		parseInitMessage(message)
-	else if (msg_type == 2):
+	elif (msg_type == 3):
 		parseNewSecretMessage(message)
-	else if (msg_type == 3):
+	elif (msg_type == 4):
 		parseLeaveMessage(message)
-	else if (msg_type == 4):
+	elif (msg_type == 5):
 		parseTextMessage(message)
 	else:
+		print ("Unrecognized message type: " + str(msg_type))
+		parseTextMessage(message)
 		# throw error
 
 def generateJoinMessage():
@@ -209,14 +214,13 @@ def generateJoinMessage():
 	signature = sign(message, private_key)
 
 	return message + signature
-	
+
 
 def generateSharedSecretDictMessage(receipients):
-	msg_type = "3"
-	sent_from = address # assumes binary address
+	msg_type = "3".encode('ascii')
+	sent_from = address.encode('ascii')
 	secret, json_dict = establishSharedSecret(receipients) # Note dict is sent unencrypted
-	dict_size = sizeof(json_dict)
-	message = msg_type + sent_from + dict_size + json_dict
+	message = msg_type + sent_from + json_dict.encode('ascii')
 
 	signature = sign(message, private_key)
 
@@ -238,19 +242,21 @@ def generateTextMessage(plaintext):
 	msg_type = "5"
 	sent_from = address
 	encrypedtext = encrypt_AES(plaintext, shared_secret)
-	msg_size = sizeof(encrypedtext)
+	msg_size = str(sys.getsizeof(encrypedtext))
 	message = msg_type + sent_from + msg_size + encrypedtext
 
 	signature = sign(message, private_key)
 
 	return message + signature
 
-'''
+"""
 public_key, private_key = generateUserKeys()
 session_key = get_random_bytes(16)
-print (session_key)
-d = generateSharedSecretDict([public_key], session_key)
-parseSharedSecretDict(d)
-'''
+d = generateSharedSecretDictMessage([public_key])
+# print(d)
+receiveAndParseMessage(d)
+"""
+
+
 
 
