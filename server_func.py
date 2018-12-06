@@ -27,11 +27,12 @@ class Server:
             keystr = kfile.read()
             self.key_pair = RSA.import_key(keystr)
             self.dig_signer = PKCS1_PSS.new(self.key_pair)
-        self.state = ServerState.UNINITIALIZED
+        self.state = self.ServerState.UNINITIALIZED
+        self.netif = netif
 
-    def listen():
+    def listen(self):
         while True:
-            status, msg = netif.receive_msg(blocking=True)
+            status, msg = self.netif.receive_msg(blocking=True)
             evaluate_msg(msg)
 
     def evaluate_msg(msg):
@@ -47,7 +48,6 @@ class Server:
         try:
             opts  = {
                 MsgType.JOIN       : response_join,
-                #    MsgType.INIT       : response_init,
                 MsgType.LEAVE      : response_leave,
                 MsgType.MESSAGE    : response_msg,
                 MsgType.SECRET     : response_secret
@@ -78,7 +78,8 @@ class Server:
         # We already have verified that the user exists (so no need to check for KeyError)
         try:
             self.group_members[msg_source] = False
-            if(reduce( lambda x, y), self.group_members[msg_source])
+            if(reduce( lambda x, y: self.group_members[x] and self.group_members[y]), self.group_members):
+                self.destroy()
             new_initiator = random.choice(list(self.group_members))
             send_init(new_initiator)
         except KeyError:
@@ -108,7 +109,7 @@ class Server:
 def verify_signature(message, signature, key):
         h = SHA.new(message)
         try:
-            PKCS1_PSS.new(k).verify(h, signature):
+            PKCS1_PSS.new(k).verify(h, signature)
             return True
         except (ValueError, TypeError):
             return False

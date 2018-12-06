@@ -64,7 +64,6 @@ chat_server = Server(netif, 'group_members.acl', 'server_sec.pem')
 
 chat_server.listen()
 
-
 '''
 prev_msg = ''
 msg_type = ''
