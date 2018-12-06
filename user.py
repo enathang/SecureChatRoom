@@ -99,17 +99,21 @@ def sign(message, private_key):
 	return signature
 
 def encrypt_AES(message, key):
-	cipher_aes = AES.new(key, AES.MODE_EAX)
-	ciphertext, tag = cipher_aes.encrypt_and_digest(message)
+    cipher_aes = AES.new(key, AES.MODE_EAX)
+    ciphertext, tag = cipher_aes.encrypt_and_digest(message)
 
-	return ciphertext, tag, cipher_aes.nonce
+    return ciphertext, cipher_aes.nonce, tag
 
 
 def decrypt_AES(message, key):
-	cipher_aes = AES.new(session_key, AES.MODE_EAX, nonce)
-	data = cipher_aes.decrypt_and_verify(ciphertext, tag)
+    tag = message[-16:]
+    msg_nonce = message[-32:-16]
+    ciphertext = message[:-32]
 
-	return msg_type, msg, MAC, signature
+    cipher_aes = AES.new(key, AES.MODE_EAX, msg_nonce)
+    plaintext = cipher_aes.decrypt_and_verify(ciphertext, tag)
+    return plaintext
+
 
 
 def generateSharedSecretDict(users_publickeys, session_key):
@@ -166,7 +170,7 @@ def establishSharedSecret(users_publickeys):
 	session_key = get_random_bytes(16)
 	secret_dictionary = generateSharedSecretDict(users_publickeys, session_key)
 	json_secret_dictionary = json.dumps(secret_dictionary)
-	
+
 	return session_key, json_secret_dictionary
 
 def parseNewSecretMessage(msg_content):
@@ -202,7 +206,7 @@ def receiveAndParseMessage(message):
 		print ("Message type 3")
 		ret = parseNewSecretMessage(msg_content) # Don't return anything
 	elif (msg_type == 4): # Leave message
-		print ("Message type 4") 
+		print ("Message type 4")
 		# Do nothing because the client should never receive this type of message
 	elif (msg_type == 5): # Encrypted text message
 		print ("Message type 5")
@@ -247,8 +251,9 @@ def generateLeaveMessage():
 def generateTextMessage(plaintext):
 	msg_type = "5".encode('ascii')
 	sent_from = address.encode('ascii')
-	encrypedtext = encrypt_AES(plaintext, shared_secret)
-	message = msg_type + sent_from + encrypedtext
+	ciphertext, msg_nonce, tag = encrypt_AES(plaintext, shared_secret)
+    msg_body = ciphertext + msg_nonce + tag
+	message = msg_type + sent_from + msg_body
 
 	signature = sign(message, private_key)
 
@@ -260,8 +265,3 @@ session_key = get_random_bytes(16)
 d = generateSharedSecretDictMessage([public_key])
 # print(d)
 receiveAndParseMessage(d)
-
-
-
-
-
