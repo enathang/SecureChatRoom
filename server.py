@@ -44,21 +44,6 @@ if OWN_ADDR not in network_interface.addr_space:
 	print('Error: Invalid address ' + OWN_ADDR)
 	sys.exit(1)
 
-#server functions
-#forwards the message provided it was not the message previously forwarded.
-def forward(msg, prev_msg):
-	if not msg == prev_msg:
-		netif.send_msg(GROUP_ADDRESSES, msg)
-	prev_msg = msg
-	return prev_msg
-
-#sends a message provided it hasn't already been sent.
-def send(dst, msg, prev_msg):
-	if not msg == prev_msg:
-		netif.send_msg(dst, msg)
-	prev_msg = msg
-	return prev_msg
-
 # main loop
 netif = network_interface(NET_PATH, OWN_ADDR)
 
