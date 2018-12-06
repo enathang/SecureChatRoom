@@ -6,7 +6,7 @@ from Crypto.Hash import SHA256
 
 import json
 import sys
-
+from base64 import b64decode, b64encode
 
 shared_secret = -1
 USER_MODE = "RSA"
@@ -119,8 +119,7 @@ def generateSharedSecretDict(users_publickeys, session_key):
 		user_key = user_publickey
 		cipher_rsa = PKCS1_OAEP.new(user_key)
 		enc_session_key = cipher_rsa.encrypt(session_key)
-		print(enc_session_key)
-		secrets_dict[str(user_publickey.export_key())] = enc_session_key.decode('utf-8')
+		secrets_dict[str(user_publickey.export_key())] = b64encode(enc_session_key).decode('utf-8')
 
 	return secrets_dict
 
@@ -138,8 +137,7 @@ def verifySignature(message, signature, key):
 
 
 def parseSharedSecretDict(secrets_dict):
-	enc_session_key = bytes(secrets_dict[str(public_key.export_key())])
-	print (enc_session_key)
+	enc_session_key = b64decode(secrets_dict[str(public_key.export_key())].encode('utf-8'))
 	cipher_rsa = PKCS1_OAEP.new(private_key)
 	session_key = cipher_rsa.decrypt(enc_session_key)
 
@@ -173,7 +171,7 @@ def establishSharedSecret(users_publickeys):
 
 def parseNewSecretMessage(msg_content):
 	secrets_dict = json.loads(msg_content)
-	parseSharedSecretDict(secrets_dict)
+	shared_secret = parseSharedSecretDict(secrets_dict)
 
 
 def parseTextMessage(msg_content):
@@ -194,16 +192,21 @@ def receiveAndParseMessage(message):
 		return -1, ""
 
 	ret = ""
-	if (msg_type == 1):
-		parseJoinMessage(message) # DONT NEED
-	elif (msg_type == 2):
-		ret = parseInitMessage(message)
-	elif (msg_type == 3):
-		ret = parseNewSecretMessage(msg_content)
-	elif (msg_type == 4):
-		parseLeaveMessage(message) #DONT NEED
-	elif (msg_type == 5):
-		ret = parseTextMessage(message)
+	if (msg_type == 1): # Join message
+		print ("Message type 1")
+		# Do nothing because the client should never receive this type of message
+	elif (msg_type == 2): # Init message
+		print ("Message type 2")
+		ret = parseInitMessage(message) # Return a message of shared secret dict
+	elif (msg_type == 3): # New shared secret message
+		print ("Message type 3")
+		ret = parseNewSecretMessage(msg_content) # Don't return anything
+	elif (msg_type == 4): # Leave message
+		print ("Message type 4") 
+		# Do nothing because the client should never receive this type of message
+	elif (msg_type == 5): # Encrypted text message
+		print ("Message type 5")
+		ret = parseTextMessage(message) # Return plaintext
 	else:
 		print ("Unrecognized message type: " + str(msg_type))
 		return -1, ""
@@ -211,8 +214,8 @@ def receiveAndParseMessage(message):
 	return msg_type, ret
 
 def generateJoinMessage():
-	msg_type = "1"
-	sent_from = address
+	msg_type = "1".encode('ascii')
+	sent_from = address.encode('ascii')
 	message = msg_type + sent_from
 
 	signature = sign(message, private_key)
@@ -225,7 +228,6 @@ def generateSharedSecretDictMessage(receipients):
 	sent_from = address.encode('ascii')
 	secret, json_dict = establishSharedSecret(receipients) # Note dict is sent unencrypted
 	message = msg_type + sent_from + json_dict.encode('ascii')
-	# print (json_dict)
 
 	signature = sign(message, private_key)
 
@@ -233,9 +235,8 @@ def generateSharedSecretDictMessage(receipients):
 
 
 def generateLeaveMessage():
-	msg_type = "4"
-	sent_from = address
-	# padding?
+	msg_type = "4".encode('ascii')
+	sent_from = address.encode('ascii')
 	message = msg_type + sent_from
 
 	signature = sign(message, private_key)
