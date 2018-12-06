@@ -16,8 +16,8 @@ SERVER_ADDR = 'S'
 class Server:
     class ServerState(Enum):
         UNINITIALIZED = 0
-        INITIALIZED = 1
-    def __init__(self, group_members_fname, keyfile):
+        INITIALIZED   = 1
+    def __init__(self, netif, group_members_fname, keyfile):
         # Read in all group members, and set them to be offline
         self.group_members = {}
         with open(group_members_fname, 'rb') as f:
@@ -26,7 +26,7 @@ class Server:
         with open(keyfile, 'r') as kfile:
             keystr = kfile.read()
             self.key_pair = RSA.import_key(keystr)
-            self.dig_signer = PKCS1_PSS.new(self.key_pair)            
+            self.dig_signer = PKCS1_PSS.new(self.key_pair)
         self.state = ServerState.UNINITIALIZED
 
     def listen():
@@ -51,18 +51,25 @@ class Server:
                 MsgType.LEAVE      : response_leave,
                 MsgType.MESSAGE    : response_msg,
                 MsgType.SECRET     : response_secret
-                }[msg_type](msg[chat_protocol.MSG_TYPE_SIZE:], msg_source)
+                }[msg_type](msg, msg_source)
         except KeyError:
             error('Invalid msg_type received. Dropping message.')
             return
-            
+
     def destroy(self):
-        self.group_members = {}
+        for usr in self.group_members:
+            self.group_members[usr] = False
         self.state = ServerState.UNINITIALIZED
 
     def validate(self, msg):
-        # Check to see if sig checks out with user
-        pass #TODO
+        try:
+            usr = msg[1:2]
+            with open(usr +'.pem', r) as usr_kfile:
+                usr_kstr = usr_kfile.read()
+                usr_sig = msg[-SIGNATURE_SIZE:]
+                verify_signature(msg[:-SIGNATURE_SIZE], usr_sig, usr_kstr)
+        except:
+            return False
 
     def response_join(msg, msg_source):
         send_init(msg_source)
@@ -71,6 +78,7 @@ class Server:
         # We already have verified that the user exists (so no need to check for KeyError)
         try:
             self.group_members[msg_source] = False
+            if(reduce( lambda x, y), self.group_members[msg_source])
             new_initiator = random.choice(list(self.group_members))
             send_init(new_initiator)
         except KeyError:
@@ -79,7 +87,7 @@ class Server:
 
     def response_msg(msg, msg_source):
         forward_msg(msg, msg_source)
-        
+
     def response_secret(msg, msg_source):
         forward_msg(msg, msg_source)
 
@@ -96,3 +104,11 @@ class Server:
         signature = signer.sign(hash)
         msg = msg + signature
         netif.send(msg)
+
+def verify_signature(message, signature, key):
+        h = SHA.new(message)
+        try:
+            PKCS1_PSS.new(k).verify(h, signature):
+            return True
+        except (ValueError, TypeError):
+            return False
