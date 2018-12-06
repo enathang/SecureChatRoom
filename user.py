@@ -4,10 +4,13 @@ from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.Signature import pkcs1_15
 from Crypto.Hash import SHA256
 
+import json
+
 
 shared_secret = -1
 USER_MODE = "RSA"
 counter = 0
+address = "A";
 
 
 def connect():
@@ -112,11 +115,6 @@ def decrypt_AES(message, key):
 	return msg_type, msg, MAC, signature
 
 
-def establishSharedSecret(users_publickeys):
-	session_key = get_random_bytes(16)
-	secret_dictionary = generateSharedSecretDict(users_publickeys, session_key)
-
-	return session_key, secret_dictionary
 
 
 def generateSharedSecretDict(users_publickeys, session_key):
@@ -167,10 +165,92 @@ def exportKeys():
 	file_out = open("private.pem", "wb")
 	file_out.write(private_key)
 
-# Codes: INIT, JOIN, MESG, LEAV, HSHK
+
+
+def establishSharedSecret(users_publickeys):
+	session_key = get_random_bytes(16)
+	secret_dictionary = generateSharedSecretDict(users_publickeys, session_key)
+	json_secret_dictionary = json.dumps(secret_dictionary)
+	
+	return session_key, secret_dictionary
+
+
+''' HIGH LEVEL API '''
+
+def receiveMessage(message):
+	msg_type = message[0]
+	msg_address = message[1]
+	msg_length = message[2]
+	msg_content = message[3:3+msg_length]
+	signature = message[3+msg_length:]
+
+	isValidSignature = verifySignature(msg_type+msg_address+msg_length+msg_content, signature, msg_address)
+
+	msg_type = message[0]
+	if (msg_type == 0):
+		parseJoinMessage(message)
+	else if (msg_type == 1):
+		parseInitMessage(message)
+	else if (msg_type == 2):
+		parseNewSecretMessage(message)
+	else if (msg_type == 3):
+		parseLeaveMessage(message)
+	else if (msg_type == 4):
+		parseTextMessage(message)
+	else:
+		# throw error
+
+def generateJoinMessage():
+	msg_type = "1"
+	sent_from = address
+	# padding?
+	message = msg_type + sent_from
+
+	signature = sign(message, private_key)
+
+	return message + signature
+	
+
+def generateSharedSecretDictMessage(receipients):
+	msg_type = "3"
+	sent_from = address # assumes binary address
+	secret, json_dict = establishSharedSecret(receipients) # Note dict is sent unencrypted
+	dict_size = sizeof(json_dict)
+	message = msg_type + sent_from + dict_size + json_dict
+
+	signature = sign(message, private_key)
+
+	return message + signature
+
+
+def generateLeaveMessage():
+	msg_type = "4"
+	sent_from = address
+	# padding?
+	message = msg_type + sent_from
+
+	signature = sign(message, private_key)
+
+	return message + signature
+
+
+def generateTextMessage(plaintext):
+	msg_type = "5"
+	sent_from = address
+	encrypedtext = encrypt_AES(plaintext, shared_secret)
+	msg_size = sizeof(encrypedtext)
+	message = msg_type + sent_from + msg_size + encrypedtext
+
+	signature = sign(message, private_key)
+
+	return message + signature
+
+'''
 public_key, private_key = generateUserKeys()
 session_key = get_random_bytes(16)
 print (session_key)
 d = generateSharedSecretDict([public_key], session_key)
 parseSharedSecretDict(d)
+'''
+
 
