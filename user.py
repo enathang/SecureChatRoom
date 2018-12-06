@@ -109,14 +109,7 @@ def decrypt_AES(message, key):
 	cipher_aes = AES.new(session_key, AES.MODE_EAX, nonce)
 	data = cipher_aes.decrypt_and_verify(ciphertext, tag)
 
-	msg_type = data[:16]
-	msg = data[16:-32]
-	MAC = data[-32:-16]
-	signature = data[-16:]
-
 	return msg_type, msg, MAC, signature
-
-
 
 
 def generateSharedSecretDict(users_publickeys, session_key):
@@ -126,7 +119,8 @@ def generateSharedSecretDict(users_publickeys, session_key):
 		user_key = user_publickey
 		cipher_rsa = PKCS1_OAEP.new(user_key)
 		enc_session_key = cipher_rsa.encrypt(session_key)
-		secrets_dict[str(user_publickey.export_key())] = str(enc_session_key)
+		print(enc_session_key)
+		secrets_dict[str(user_publickey.export_key())] = enc_session_key.decode('utf-8')
 
 	return secrets_dict
 
@@ -144,7 +138,8 @@ def verifySignature(message, signature, key):
 
 
 def parseSharedSecretDict(secrets_dict):
-	enc_session_key = secrets_dict[public_key.export_key()]
+	enc_session_key = bytes(secrets_dict[str(public_key.export_key())])
+	print (enc_session_key)
 	cipher_rsa = PKCS1_OAEP.new(private_key)
 	session_key = cipher_rsa.decrypt(enc_session_key)
 
@@ -176,39 +171,48 @@ def establishSharedSecret(users_publickeys):
 	
 	return session_key, json_secret_dictionary
 
+def parseNewSecretMessage(msg_content):
+	secrets_dict = json.loads(msg_content)
+	parseSharedSecretDict(secrets_dict)
+
+
+def parseTextMessage(msg_content):
+	plaintext = ""
+	# plaintext = decrypt_aes(msg_content, sharedsecret)
+	return plaintext
 
 ''' HIGH LEVEL API '''
 signature_length = 256
 def receiveAndParseMessage(message):
 	msg_type = int(message[0:1].decode('ascii'))
 	msg_address = message[1:2].decode('ascii')
-	msg_content = json.loads(message[3:-signature_length].decode('ascii'))
-	print(msg_content)
+	msg_content = message[2:-signature_length].decode('ascii')
 	signature = message[-signature_length:]
 
 	isValidSignature = verifySignature(message[0:-signature_length], signature, public_key) # shoud be address
 	if (not isValidSignature):
-		return False
+		return -1, ""
 
+	ret = ""
 	if (msg_type == 1):
-		parseJoinMessage(message)
+		parseJoinMessage(message) # DONT NEED
 	elif (msg_type == 2):
-		parseInitMessage(message)
+		ret = parseInitMessage(message)
 	elif (msg_type == 3):
-		parseNewSecretMessage(message)
+		ret = parseNewSecretMessage(msg_content)
 	elif (msg_type == 4):
-		parseLeaveMessage(message)
+		parseLeaveMessage(message) #DONT NEED
 	elif (msg_type == 5):
-		parseTextMessage(message)
+		ret = parseTextMessage(message)
 	else:
 		print ("Unrecognized message type: " + str(msg_type))
-		parseTextMessage(message)
-		# throw error
+		return -1, ""
+
+	return msg_type, ret
 
 def generateJoinMessage():
 	msg_type = "1"
 	sent_from = address
-	# padding?
 	message = msg_type + sent_from
 
 	signature = sign(message, private_key)
@@ -221,6 +225,7 @@ def generateSharedSecretDictMessage(receipients):
 	sent_from = address.encode('ascii')
 	secret, json_dict = establishSharedSecret(receipients) # Note dict is sent unencrypted
 	message = msg_type + sent_from + json_dict.encode('ascii')
+	# print (json_dict)
 
 	signature = sign(message, private_key)
 
@@ -239,23 +244,22 @@ def generateLeaveMessage():
 
 
 def generateTextMessage(plaintext):
-	msg_type = "5"
-	sent_from = address
+	msg_type = "5".encode('ascii')
+	sent_from = address.encode('ascii')
 	encrypedtext = encrypt_AES(plaintext, shared_secret)
-	msg_size = str(sys.getsizeof(encrypedtext))
-	message = msg_type + sent_from + msg_size + encrypedtext
+	message = msg_type + sent_from + encrypedtext
 
 	signature = sign(message, private_key)
 
 	return message + signature
 
-"""
+
 public_key, private_key = generateUserKeys()
 session_key = get_random_bytes(16)
 d = generateSharedSecretDictMessage([public_key])
 # print(d)
 receiveAndParseMessage(d)
-"""
+
 
 
 
