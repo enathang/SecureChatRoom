@@ -13,90 +13,13 @@ USER_MODE = "RSA"
 counter = 0
 address = "A";
 
-'''
-def connect():
-	msg = establishConnection()
-	server_msg = send(msg)
-	type, contents = parse(server_msg)
-	if (type == b"INIT"):
-		shared_secret, secret_dictionary = establishSharedSecret
-		msg = secret_dictionary
-	else if (type == b"JOIN"):
-		shared_secret = parseSharedSecretDict(contents)
-		msg = handshake()
-	server_msg = send(msg)
-	type, contents = parse(server_msg)
-	if (type == "HSHK"):
-		switchMode()
 
-
-def read():
-	server_msg = receive()
-	if (USER_MODE == "AES"):
-		msg_type, sender, msg, MAC, signature = decrypt_AES(server_msg, shared_secret)
-		if (verifySignature(msg, signature, sender)):
-			if (verifyMAC(msg, MAC)):
-				plaintext = msg.decode("utf-8")
-
-
-
-
-
-def mac(msg, counter):
-	# TODO: generate MAC for msg and counter
-
-
-# Message = AES{Type|MESSAGE|MAC{COUNTER}|Signature}
-def write(msg):
-	msg_type = b"MESG"
-	plaintext = msg
-	MAC = mac(msg_type+msg, counter)
-	message = msg_type+plaintext+MAC
-	signature = sign(message, private_key)
-	enc_message = encrypt_AES(message+signature, shared_secret)
-
-	send(enc_message)
-
-
-def disconnect():
-	msg = dropConnection()
-	send(msg)
-
-
-def switchMode():
-	if (USER_MODE == "RSA"):
-		USER_MODE = "AES"
-	else:
-		USER_MODE = "RSA"
-
-
-def establishConnection():
-	# Message
-	message_type = b"JOIN"
-	public_key_string = public_key.export_key()
-	message = message_type+public_key_string
-	signature = sign(message, private_key)
-
-	return message+signature
-
-
-def dropConnection():
-	# Message
-	message_type = b"LEAV"
-	public_key_string = public_key.export_key()
-	message = message_type+public_key_string
-
-	# Signature
-	h = SHA256.new(message)
-	signature = pkcs1_15.new(private_key).sign(h)
-
-	return message+signature
-'''
 def sign(message, private_key):
 	h = SHA256.new(message)
 	signature = pkcs1_15.new(private_key).sign(h)
 
 	return signature
+
 
 def encrypt_AES(message, key):
     if(key == -1):
@@ -104,6 +27,7 @@ def encrypt_AES(message, key):
     cipher_aes = AES.new(key, AES.MODE_EAX)
     ciphertext, tag = cipher_aes.encrypt_and_digest(message)
     return ciphertext, cipher_aes.nonce, tag
+
 
 def getPublicKey(address):
 	key_file = "keys/"+address+"_pub.pem"
@@ -123,7 +47,6 @@ def decrypt_AES(message, key):
     cipher_aes = AES.new(key, AES.MODE_EAX, msg_nonce)
     plaintext = cipher_aes.decrypt_and_verify(ciphertext, tag)
     return plaintext
-
 
 
 def generateSharedSecretDict(users_publickeys, session_key):
@@ -168,20 +91,13 @@ def generateUserKeys():
 	return public_key, private_key
 
 
-def exportKeys():
-	file_out = open("receiver.pem", "wb")
-	file_out.write(public_key)
-	file_out = open("private.pem", "wb")
-	file_out.write(private_key)
-
-
-
 def establishSharedSecret(users_publickeys):
 	session_key = get_random_bytes(16)
 	secret_dictionary = generateSharedSecretDict(users_publickeys, session_key)
 	json_secret_dictionary = json.dumps(secret_dictionary)
 
 	return session_key, json_secret_dictionary
+
 
 def parseNewSecretMessage(msg_content):
 	secrets_dict = json.loads(msg_content)
@@ -204,6 +120,7 @@ def receiveAndParseMessage(message):
 
 	isValidSignature = verifySignature(message[0:-signature_length], signature, msg_public_key) # shoud be address
 	if (not isValidSignature):
+		print ("Is not valid signature")
 		return -1, ""
 
 	ret = ""
@@ -212,7 +129,7 @@ def receiveAndParseMessage(message):
 		# Do nothing because the client should never receive this type of message
 	elif (msg_type == 2): # Init message
 		print ("Message type 2")
-		ret = parseInitMessage(message) # Return a message of shared secret dict
+		ret = generateSharedSecretDictMessage(message) # Return a message of shared secret dict
 	elif (msg_type == 3): # New shared secret message
 		print ("Message type 3")
 		ret = parseNewSecretMessage(msg_content) # Don't return anything
