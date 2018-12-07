@@ -16,7 +16,7 @@ from chat_protocol import MsgType
 import chat_protocol
 
 
-#import user
+import user
 
 import tkinter
 from threading import Thread
@@ -64,8 +64,18 @@ netif = network_interface(NET_PATH, OWN_ADDR)
 
 
 ## send join, recieve init, and generate new secret
+join_msg = user.generateJoinMessage()
+netif.send_msg('S', join_msg)
+status, respond_msg = netif.receive_msg(blocking=False)
+if not status:
+	print('no response from the server, exiting')
+	quit()
+elif status:
+	msg_type, msg = user.receiveAndParseMessage(respond_msg)
+	netif.send_msg('S', msg)
+print('join protocol finished')
 
-	
+
 
 
 ## gui
@@ -73,23 +83,30 @@ def gui_send(event = None):
 	
 	msg_list.insert(tkinter.END, 'you: ' + my_msg.get())
 	plain_msg = my_msg.get()
+	enc_msg = user.generateTextMessage(plain_msg)
 	my_msg.set('')
 	## send actually send a message.
-	netif.send_msg('S', plain_msg.encode('utf-8'))
+	netif.send_msg('S', enc_msg)
 	
 
 
 def gui_recieve():
 	while True:
 		msg = netif.receive_msg(blocking=True)
-		author = '' ## set this to be the author of the mes
-		msg_list.insert(tkinter.END, author + ': ' + msg)
+		msg_type, parsed_msg = user.receiveAndParseMessage(msg)
+		if msg_type == '2':
+    			netif.send_msg('S', parsed_msg)
+		else:
+			text_msg = parsed_msg
+			msg_list.insert(tkinter.END, text_msg)
 
 
 def on_closing(event=None):
-	# 	netif.send_msg(SERVER, generateLeavemessage)
+	netif.send_msg('S', user.generateLeaveMessage())
 	top.quit()
-	
+	top.destroy()
+	print('disconnected from server')
+	quit()
 
 
 top = tkinter.Tk()
