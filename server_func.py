@@ -62,12 +62,12 @@ class Server:
             return
 
     def destroy(self):
+        print('Server resetting...')
         for usr in self.group_members:
             self.group_members[usr] = False
         self.state = ServerState.UNINITIALIZED
 
     def validate(self, msg):
-        return True # TODO fix this
         print('Validating msg...\n', msg[:-MSG_SIGNATURE_SIZE])
         try:
             usr = msg[1:2].decode('ascii')
@@ -77,7 +77,8 @@ class Server:
 
                 usr_sig = msg[-MSG_SIGNATURE_SIZE:]
                 verify_signature(msg[:-MSG_SIGNATURE_SIZE], usr_sig, usr_key)
-        except KeyError:
+                return True
+        except SyntaxError:
             return False
 
     def response_join(self, msg, msg_source):
@@ -90,7 +91,7 @@ class Server:
         # We already have verified that the user exists (so no need to check for KeyError)
         try:
             self.group_members[msg_source] = False
-            if(reduce( lambda x, y: self.group_members[x] and self.group_members[y]), self.group_members):
+            if(len([x for x in self.group_members if self.group_members[x]]) != 0):
                 self.destroy()
             new_initiator = random.choice(list(self.group_members))
             self.send_init(new_initiator)
@@ -140,9 +141,9 @@ class Server:
 
 def verify_signature(message, signature, key):
         h = SHA256.new(message)
-        print(key)
+        print(message, key)
         try:
             PKCS1_PSS.new(key).verify(h, signature)
             return True
-        except (ValueError, TypeError):
+        except SyntaxError:
             return False
