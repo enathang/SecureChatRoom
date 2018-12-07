@@ -34,7 +34,7 @@ class Server:
     def listen(self):
         while True:
             status, msg = self.netif.receive_msg(blocking=True)
-            evaluate_msg(msg)
+            self.evaluate_msg(msg)
 
     def evaluate_msg(self, msg):
         try:
