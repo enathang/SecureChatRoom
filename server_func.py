@@ -112,7 +112,8 @@ class Server:
         return msg
 
     def send_init(self, usr):
-        msg_type = bytes([MsgType.INIT])
+#        msg_type = bytes([MsgType.INIT])
+        msg_type = str(MsgType.INIT).encode('ascii')
         msg = format_msg(self, msg)
         send_msg(self, msg, usr)
 
