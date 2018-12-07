@@ -149,7 +149,7 @@ def receiveAndParseMessage(message): # Make this just a fixed thing
 		ret = generateSharedSecretDictMessage() # Return a message of shared secret dict
 	elif (msg_type == MsgType.SECRET): # New shared secret message
 		print ("Message type SECRET")
-		ret = parseNewSecretMessage(message[2:-signature_length].decode('ascii'))
+		ret = parseNewSecretMessage(message[2:-signature_length].decode('utf-8'))
 	elif (msg_type == MsgType.LEAVE): # Leave message
 		print ("Message type LEAVE")
 		# Do nothing because the client should never receive this type of message
@@ -175,7 +175,7 @@ def generateSharedSecretDictMessage():
 	msg_type = str(int(MsgType.SECRET)).encode('ascii')
 	sent_from = address.encode('ascii')
 	secret, json_dict = establishSharedSecret('ABCDE') # Note dict is sent unencrypted
-	message = msg_type + sent_from + json_dict.encode('ascii')
+	message = msg_type + sent_from + json_dict.encode('utf-8')
 
 	signature = sign(message, private_key)
 
