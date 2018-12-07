@@ -52,7 +52,7 @@ class Server:
                 MsgType.LEAVE      : response_leave,
                 MsgType.MESSAGE    : response_msg,
                 MsgType.SECRET     : response_secret
-                }[msg_type](msg, msg_source)
+                }[msg_type-1](msg, msg_source)
         except KeyError:
             print('Invalid msg_type received. Dropping message.', file=sys.stderr)
             return
@@ -113,6 +113,7 @@ class Server:
 
     def send_init(self, usr):
 #        msg_type = bytes([MsgType.INIT])
+        print('Received msg from', usr, 'Sending init...\n')
         msg_type = str(MsgType.INIT).encode('ascii')
         msg = format_msg(self, msg)
         self.send_msg(self, msg, usr)
