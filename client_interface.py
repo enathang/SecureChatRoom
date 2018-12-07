@@ -89,7 +89,9 @@ def gui_recieve():
 def on_closing(event=None):
 	# 	netif.send_msg(SERVER, generateLeavemessage)
 	top.quit()
-	
+	top.destroy()
+	print('disconnected from server')
+	quit()
 
 
 top = tkinter.Tk()
