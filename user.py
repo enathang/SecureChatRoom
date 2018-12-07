@@ -1,4 +1,4 @@
-from Crypto.Random import get_random_bytes
+print(from Crypto.Random import get_random_bytes
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.Signature import pkcs1_15
@@ -22,9 +22,10 @@ def sign(message, private_key):
 
 
 def encrypt_AES(message, key):
+    if(key == -1):
+        print('Cannot encrypt text before shared secret is established.')
     cipher_aes = AES.new(key, AES.MODE_EAX)
     ciphertext, tag = cipher_aes.encrypt_and_digest(message)
-
     return ciphertext, cipher_aes.nonce, tag
 
 
@@ -37,6 +38,8 @@ def getPublicKey(address):
 
 
 def decrypt_AES(message, key):
+    if(key == -1):
+        print('Cannot encrypt text before shared secret is established.')
     tag = message[-16:]
     msg_nonce = message[-32:-16]
     ciphertext = message[:-32]
