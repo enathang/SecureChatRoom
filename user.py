@@ -1,7 +1,7 @@
 from Crypto.Random import get_random_bytes
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import AES, PKCS1_OAEP
-from Crypto.Signature import pkcs1_15
+from Crypto.Signature import PKCS1_PSS
 from Crypto.Hash import SHA256
 from chat_protocol import MsgType
 
@@ -17,7 +17,7 @@ address = "A";
 
 def sign(message, private_key):
 	h = SHA256.new(message)
-	signature = pkcs1_15.new(private_key).sign(h)
+	signature = PKCS1_PSS.new(private_key).sign(h)
 
 	return signature
 
@@ -70,7 +70,7 @@ def generateSharedSecretDict(users_publickeys, session_key):
 def verifySignature(message, signature, key):
 	h = SHA256.new(message)
 	try:
-	    pkcs1_15.new(key).verify(h, signature)
+	    PKCS1_PSS.new(key).verify(h, signature)
 	    #print "The signature is valid."
 	    return True
 	except (ValueError, TypeError):
