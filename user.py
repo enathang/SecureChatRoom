@@ -3,6 +3,7 @@ from Crypto.PublicKey import RSA
 from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.Signature import pkcs1_15
 from Crypto.Hash import SHA256
+from chat_protocol import MsgType
 
 import json
 import sys
@@ -128,19 +129,19 @@ def receiveAndParseMessage(message): # Make this just a fixed thing
 		return -1, ""
 
 	ret = ""
-	if (msg_type == 1): # Join message
+	if (msg_type == MsgType.JOIN): # Join message
 		print ("Message type 1")
 		# Do nothing because the client should never receive this type of message
-	elif (msg_type == 2): # Init message
+	elif (msg_type == MsgType.INIT): # Init message
 		print ("Message type 2")
 		ret = generateSharedSecretDictMessage(message) # Return a message of shared secret dict
-	elif (msg_type == 3): # New shared secret message
+	elif (msg_type == MsgType.SECRET): # New shared secret message
 		print ("Message type 3")
 		ret = parseNewSecretMessage(message[2:-signature_length].decode('ascii'))
-	elif (msg_type == 4): # Leave message
+	elif (msg_type == MsgType.LEAVE): # Leave message
 		print ("Message type 4")
 		# Do nothing because the client should never receive this type of message
-	elif (msg_type == 5): # Encrypted text message
+	elif (msg_type == MsgType.MSG): # Encrypted text message
 		print ("Message type 5")
 		ret = parseTextMessage(message) # Return plaintext
 	else:
@@ -150,7 +151,7 @@ def receiveAndParseMessage(message): # Make this just a fixed thing
 	return msg_type, ret
 
 def generateJoinMessage():
-	msg_type = "1".encode('ascii')
+	msg_type = str(int(MsgType.JOIN)).encode('ascii')
 	sent_from = address.encode('ascii')
 	message = msg_type + sent_from
 
@@ -160,7 +161,7 @@ def generateJoinMessage():
 
 
 def generateSharedSecretDictMessage(receipients):
-	msg_type = "3".encode('ascii')
+	msg_type = str(int(MsgType.SECRET)).encode('ascii')
 	sent_from = address.encode('ascii')
 	secret, json_dict = establishSharedSecret(receipients) # Note dict is sent unencrypted
 	message = msg_type + sent_from + json_dict.encode('ascii')
@@ -171,7 +172,7 @@ def generateSharedSecretDictMessage(receipients):
 
 
 def generateLeaveMessage():
-	msg_type = "4".encode('ascii')
+	msg_type = str(int(MsgType.LEAVE)).encode('ascii')
 	sent_from = address.encode('ascii')
 	message = msg_type + sent_from
 
@@ -182,7 +183,7 @@ def generateLeaveMessage():
 
 def generateTextMessage(plaintext):
 	plaintext = plaintext.encode('ascii') if not type(plaintext) == bytes else plaintext
-	msg_type = "5".encode('ascii')
+	msg_type = str(int(MsgType.MSG)).encode('ascii')
 	sent_from = address.encode('ascii')
 	ciphertext, msg_nonce, tag = encrypt_AES(plaintext, session_key)
 	msg_body = ciphertext + msg_nonce + tag
