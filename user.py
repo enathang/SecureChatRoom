@@ -71,7 +71,7 @@ def generateSharedSecretDict(user_list):
             user_key = RSA.import_key(usr_kstr)
             cipher_rsa = PKCS1_OAEP.new(user_key)
             enc_session_key = cipher_rsa.encrypt(session_key)
-            secrets_dict[usr] = b64encode(enc_session_key).decode('utf-8')
+            secrets_dict[usr] = b64encode(enc_session_key).decode('ascii')
 
     return secrets_dict
 
@@ -89,7 +89,7 @@ def verifySignature(message, signature, key):
 
 
 def parseSharedSecretDict(secrets_dict):
-	enc_session_key = b64decode(secrets_dict[address]).encode('utf-8')
+	enc_session_key = b64decode(secrets_dict[address].encode('ascii'))
 	cipher_rsa = PKCS1_OAEP.new(private_key)
 	session_key = cipher_rsa.decrypt(enc_session_key)
 
@@ -117,7 +117,7 @@ def establishSharedSecret(users_list):
 
 
 def parseNewSecretMessage(msg_content):
-	secrets_dict = json.loads(msg_content)
+	secrets_dict = json.loads(msg_content.decode('utf-8'))
 	shared_secret = parseSharedSecretDict(secrets_dict)
 
 
@@ -149,7 +149,8 @@ def receiveAndParseMessage(message): # Make this just a fixed thing
 		ret = generateSharedSecretDictMessage() # Return a message of shared secret dict
 	elif (msg_type == MsgType.SECRET): # New shared secret message
 		print ("Message type SECRET")
-		ret = parseNewSecretMessage(message[2:-signature_length].decode('utf-8'))
+		index = message.index(b"\"}")
+		ret = parseNewSecretMessage(message[2:index+2])
 	elif (msg_type == MsgType.LEAVE): # Leave message
 		print ("Message type LEAVE")
 		# Do nothing because the client should never receive this type of message
