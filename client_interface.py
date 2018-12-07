@@ -56,7 +56,7 @@ if OWN_ADDR not in network_interface.addr_space:
 	print('Error: Invalid address ' + OWN_ADDR)
 	sys.exit(1)
 
-
+user.init_user(OWN_ADDR)
 
 
 # start main loop 
