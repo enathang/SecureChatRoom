@@ -4,7 +4,9 @@ from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.Signature import PKCS1_PSS
 from Crypto.Hash import SHA256
 from chat_protocol import MsgType
+from pathlib import Path
 
+import os
 import json
 import sys
 from base64 import b64decode, b64encode
@@ -33,6 +35,7 @@ def encrypt_AES(message, key):
         print('Cannot encrypt text before shared secret is established.')
     cipher_aes = AES.new(key, AES.MODE_EAX)
     ciphertext, tag = cipher_aes.encrypt_and_digest(message)
+    print('encrypted to: ', ciphertext)
     return ciphertext, cipher_aes.nonce, tag
 
 
@@ -55,7 +58,7 @@ def decrypt_AES(message, key):
     tag = message[-16:]
     msg_nonce = message[-32:-16]
     ciphertext = message[:-32]
-#DEBUG    print('tag: ', tag, '\nnonce: ', msg_nonce, '\nciphertext: ', ciphertext)
+    print('tag: ', tag, '\nnonce: ', msg_nonce, '\nciphertext: ', ciphertext)
     cipher_aes = AES.new(key, AES.MODE_EAX, msg_nonce)
     plaintext = cipher_aes.decrypt_and_verify(ciphertext, tag)
     return plaintext
@@ -65,13 +68,12 @@ def generateSharedSecretDict(user_list):
     secrets_dict = dict()
 
     for usr in user_list:
-
         with open('./keys/' + usr +'_pub.pem', 'r') as usr_kfile:
             usr_kstr = usr_kfile.read()
             user_key = RSA.import_key(usr_kstr)
             cipher_rsa = PKCS1_OAEP.new(user_key)
-            enc_session_key = cipher_rsa.encrypt(session_key)
-            secrets_dict[usr] = b64encode(enc_session_key).decode('utf-8')
+            enc_session_key = b64encode(cipher_rsa.encrypt(session_key))
+            secrets_dict[usr] = enc_session_key.decode()
 
     return secrets_dict
 
@@ -89,7 +91,7 @@ def verifySignature(message, signature, key):
 
 
 def parseSharedSecretDict(secrets_dict):
-	enc_session_key = b64decode(secrets_dict[address]).encode('utf-8')
+	enc_session_key = b64decode(secrets_dict[address])
 	cipher_rsa = PKCS1_OAEP.new(private_key)
 	session_key = cipher_rsa.decrypt(enc_session_key)
 
@@ -109,9 +111,10 @@ def generateUserKeys():
 def establishSharedSecret(users_list):
     print('establishin...')
     global session_key
-    session_key = get_random_bytes(16)
+    #session_key = get_random_bytes(16)
     secret_dictionary = generateSharedSecretDict(users_list)
-    json_secret_dictionary = json.dumps(secret_dictionary)
+    print(secret_dictionary)
+    json_secret_dictionary = b64encode(json.dumps(secret_dictionary).encode('ascii'))
 
     return session_key, json_secret_dictionary
 
@@ -149,7 +152,7 @@ def receiveAndParseMessage(message): # Make this just a fixed thing
 		ret = generateSharedSecretDictMessage() # Return a message of shared secret dict
 	elif (msg_type == MsgType.SECRET): # New shared secret message
 		print ("Message type SECRET")
-		ret = parseNewSecretMessage(message[2:-signature_length].decode('utf-8'))
+		ret = parseNewSecretMessage(b64decode(message[2:-signature_length]).decode('ascii'))
 	elif (msg_type == MsgType.LEAVE): # Leave message
 		print ("Message type LEAVE")
 		# Do nothing because the client should never receive this type of message
@@ -170,12 +173,27 @@ def generateJoinMessage():
 	signature = sign(message, private_key)
 	return message + signature
 
+'''
+def generateChallengeMessage():
+    msg_type = str(int(MsgType.CHALLENGE)).encode('ascii')
+    sent_from = address.encode('ascii')
+    nonce = get_random_bytes(16)
+    set_challenge_info(nonce)
 
+    cipher = PKCS1_OAEP.new(getPublicKey('S'))
+    cipher.encrypt(nonce)
+
+    signature = sign(message, private_key)
+    return message + signature
+
+def parseChallengeResponse():
+    if(nonce == get_challenge_nonce())
+'''
 def generateSharedSecretDictMessage():
 	msg_type = str(int(MsgType.SECRET)).encode('ascii')
 	sent_from = address.encode('ascii')
 	secret, json_dict = establishSharedSecret('ABCDE') # Note dict is sent unencrypted
-	message = msg_type + sent_from + json_dict.encode('utf-8')
+	message = msg_type + sent_from + json_dict#.encode('utf-8')
 
 	signature = sign(message, private_key)
 
@@ -207,4 +225,4 @@ def generateTextMessage(plaintext):
 
 public_key = getPublicKey(address)
 private_key = get_private_key(address)
-# session_key = get_random_bytes(16)
+session_key = b'0123456789abcdef'#get_random_bytes(16)
