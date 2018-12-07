@@ -75,7 +75,7 @@ def gui_send(event = None):
 	plain_msg = my_msg.get()
 	my_msg.set('')
 	## send actually send a message.
-	netif.send_msg('B', plain_msg.encode('utf-8'))
+	netif.send_msg('S', plain_msg.encode('utf-8'))
 	
 
 
