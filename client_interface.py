@@ -16,7 +16,7 @@ from chat_protocol import MsgType
 import chat_protocol
 
 
-import user
+#import user
 
 import tkinter
 from threading import Thread
@@ -61,44 +61,35 @@ if OWN_ADDR not in network_interface.addr_space:
 
 # start main loop 
 netif = network_interface(NET_PATH, OWN_ADDR)
+
+
 ## send join, recieve init, and generate new secret
-print("connecting to server")
-netif.send_msg(SERVER, user.generateJoinMessage())
-status, response = netif.receive_msg(blocking=True)
-# if not checktype(response) == 2:
-# 		print('uh oh something went wrong, and we couldn\'t connect to the server')
-# 	sys.exit(1)
-# else:
-netif.send_msg(SERVER, user.generateSharedSecretDictMessage())
 
 	
 
 
 ## gui
 def gui_send(event = None):
+	
+	msg_list.insert(tkinter.END, 'you: ' + my_msg.get())
 	plain_msg = my_msg.get()
 	my_msg.set('')
-	if plain_msg == "{quit}":
-		netif.send_msg(user.generateLeaveMessage())
-		top.quit()
-	else:
-		netif.send_msg('S', user.generateTextMessage(plain_msg))
+	## send actually send a message.
+	netif.send_msg('B', plain_msg.encode('utf-8'))
+	
 
 
 def gui_recieve():
 	while True:
-		enc_msg = recieve(netif)
-		msg_type, msg = user.recieveAndParseMessage(message)
-		msg_list.insert(tkinter.END, msg)
+		msg = netif.receive_msg(blocking=True)
+		author = '' ## set this to be the author of the mes
+		msg_list.insert(tkinter.END, author + ': ' + msg)
 
 
 def on_closing(event=None):
-	my_msg.set("{quit}")
-	plain_msg = my_msg.get()
-	my_msg.set('')
-	if plain_msg == "{quit}":
-		netif.send_msg(SERVER, generateLeavemessage)
-		top.quit()
+	# 	netif.send_msg(SERVER, generateLeavemessage)
+	top.quit()
+	
 
 
 top = tkinter.Tk()
@@ -106,7 +97,6 @@ top.title('CsippCseppCsatApp')
 
 messages_frame = tkinter.Frame(top)
 my_msg = tkinter.StringVar()
-my_msg.set("Type your messages here.")
 scrollbar = tkinter.Scrollbar(messages_frame)
 
 msg_list = tkinter.Listbox(messages_frame, height=15, width=50, yscrollcommand=scrollbar.set)
@@ -124,7 +114,7 @@ send_button.pack()
 
 top.protocol("WM_DELETE_WINDOW", on_closing)
 
-receive_thread = Thread(target=gui_receive)
+receive_thread = Thread(target=gui_recieve)
 receive_thread.start()
 
 tkinter.mainloop()  # Starts GUI execution.
