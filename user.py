@@ -43,7 +43,8 @@ def decrypt_AES(message, key):
     tag = message[-16:]
     msg_nonce = message[-32:-16]
     ciphertext = message[:-32]
-
+    print('tag: ', tag)
+    print('ciphertext:', ciphertext)
     cipher_aes = AES.new(key, AES.MODE_EAX, msg_nonce)
     plaintext = cipher_aes.decrypt_and_verify(ciphertext, tag)
     return plaintext
@@ -177,14 +178,16 @@ def generateLeaveMessage():
 
 
 def generateTextMessage(plaintext):
+	plaintext = plaintext.encode('ascii') if not type(plaintext) == bytes else plaintext
 	msg_type = "5".encode('ascii')
 	sent_from = address.encode('ascii')
-	ciphertext, msg_nonce, tag = encrypt_AES(plaintext.encode('ascii'), session_key)
+	ciphertext, msg_nonce, tag = encrypt_AES(plaintext, session_key)
 	msg_body = ciphertext + msg_nonce + tag
 	message = msg_type + sent_from + msg_body
 
 	signature = sign(message, private_key)
-
+	print('ciphertext: ', ciphertext)
+	print('tag: ', tag)
 	return message + signature
 
 
