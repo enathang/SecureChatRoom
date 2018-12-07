@@ -105,7 +105,7 @@ def encrypt_AES(message, key):
     return ciphertext, cipher_aes.nonce, tag
 
 def getPublicKey(address):
-	key_file = address+"_PK.pem"
+	key_file = "keys/"+address+"_pub.pem"
 	with open(key_file) as f:
 		key = RSA.import_key(f.read())
 
