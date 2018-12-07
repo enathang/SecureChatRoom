@@ -189,8 +189,8 @@ def parseNewSecretMessage(msg_content):
 
 
 def parseTextMessage(msg_content):
-	plaintext = ""
-	# plaintext = decrypt_aes(msg_content, sharedsecret)
+    msg_body = msg_content[2:-256]
+    plaintext = decrypt_AES(msg_content, session_key)
 	return plaintext
 
 ''' HIGH LEVEL API '''
