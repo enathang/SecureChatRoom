@@ -28,7 +28,7 @@ class Server:
             keystr = kfile.read()
             self.key_pair = RSA.import_key(keystr)
             self.dig_signer = PKCS1_PSS.new(self.key_pair)
-        self.state = self.ServerState.UNINITIALIZED
+        #self.state = self.ServerState.UNINITIALIZED
         self.netif = netif
 
     def listen(self):
@@ -65,7 +65,7 @@ class Server:
         print('Server resetting...')
         for usr in self.group_members:
             self.group_members[usr] = False
-        self.state = ServerState.UNINITIALIZED
+        #self.state = ServerState.UNINITIALIZED
 
     def validate(self, msg):
         print('Validating msg...\n', msg[:-MSG_SIGNATURE_SIZE])
