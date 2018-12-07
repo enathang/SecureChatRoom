@@ -33,10 +33,12 @@ class Server:
 
     def listen(self):
         while True:
+            print('Waiting for msg...')
             status, msg = self.netif.receive_msg(blocking=True)
             self.evaluate_msg(msg)
 
     def evaluate_msg(self, msg):
+        print('Evaluating msg...')
         try:
             msg_type = int(msg[:chat_protocol.MSG_TYPE_SIZE])
         except ValueError:
@@ -52,7 +54,7 @@ class Server:
                 MsgType.LEAVE      : response_leave,
                 MsgType.MESSAGE    : response_msg,
                 MsgType.SECRET     : response_secret
-                }[msg_type-1](msg, msg_source)
+                }[msg_type](msg, msg_source)
         except KeyError:
             print('Invalid msg_type received. Dropping message.', file=sys.stderr)
             return
@@ -63,6 +65,7 @@ class Server:
         self.state = ServerState.UNINITIALIZED
 
     def validate(self, msg):
+        print('Validating msg...')
         try:
             usr = msg[1:2]
             with open(usr +'_pub.pem', r) as usr_kfile:
@@ -73,9 +76,11 @@ class Server:
             return False
 
     def response_join(self, msg, msg_source):
+        print('Responding to join message...')
         self.send_init(msg_source)
 
     def response_leave(self, msg, msg_source):
+        print('Responding to leave message...')
         # We already have verified that the user exists (so no need to check for KeyError)
         try:
             self.group_members[msg_source] = False
@@ -88,18 +93,22 @@ class Server:
             return
 
     def response_msg(self, msg, msg_source):
+        print('Responding to text message...')
         self.forward_msg(msg, msg_source)
 
     def response_secret(self, msg, msg_source):
+        print('Responding to secret message...')
         self.forward_msg(msg, msg_source)
 
     def forward_msg(self, msg, msg_source):
+        print('Forwarding message from ', msg_source)
         dest_addresses = ''.join(
             [dest for dest in self.group_members if self.group_members[dest]]
             )
         self.send_msg(msg, data_addresses)
 
     def send_msg(self, msg, data_addresses):
+        print('Sending message to ', data_addresses.decode())
         # Below commented line if we want server wrapping messages with its own addr/sig combo
         #msg = self.format_msg(msg)
         self.netif.send_msg(data_addresses.decode(), msg)
