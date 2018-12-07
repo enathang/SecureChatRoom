@@ -1,4 +1,4 @@
-print(from Crypto.Random import get_random_bytes
+from Crypto.Random import get_random_bytes
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.Signature import pkcs1_15
@@ -43,7 +43,8 @@ def decrypt_AES(message, key):
     tag = message[-16:]
     msg_nonce = message[-32:-16]
     ciphertext = message[:-32]
-
+    print('tag: ', tag)
+    print('ciphertext:', ciphertext)
     cipher_aes = AES.new(key, AES.MODE_EAX, msg_nonce)
     plaintext = cipher_aes.decrypt_and_verify(ciphertext, tag)
     return plaintext
@@ -107,7 +108,7 @@ def parseNewSecretMessage(msg_content):
 def parseTextMessage(msg_content):
     msg_body = msg_content[2:-256]
     plaintext = decrypt_AES(msg_content, session_key)
-	return plaintext
+    return plaintext
 
 ''' HIGH LEVEL API '''
 signature_length = 256
@@ -177,14 +178,16 @@ def generateLeaveMessage():
 
 
 def generateTextMessage(plaintext):
+	plaintext = plaintext.encode('ascii') if not type(plaintext) == bytes else plaintext
 	msg_type = "5".encode('ascii')
 	sent_from = address.encode('ascii')
-	ciphertext, msg_nonce, tag = encrypt_AES(plaintext, shared_secret)
+	ciphertext, msg_nonce, tag = encrypt_AES(plaintext, session_key)
 	msg_body = ciphertext + msg_nonce + tag
 	message = msg_type + sent_from + msg_body
 
 	signature = sign(message, private_key)
-
+	print('ciphertext: ', ciphertext)
+	print('tag: ', tag)
 	return message + signature
 
 
