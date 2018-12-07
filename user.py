@@ -36,6 +36,11 @@ def getPublicKey(address):
 
 	return key
 
+def get_private_key(address):
+	key_file = "keys/"+address+"_priv.pem"
+	with open(key_file) as f:
+		key = RSA.import_key(f.read())
+	return key
 
 def decrypt_AES(message, key):
     if(key == -1):
@@ -43,8 +48,7 @@ def decrypt_AES(message, key):
     tag = message[-16:]
     msg_nonce = message[-32:-16]
     ciphertext = message[:-32]
-    print('tag: ', tag)
-    print('ciphertext:', ciphertext)
+#DEBUG    print('tag: ', tag, '\nnonce: ', msg_nonce, '\nciphertext: ', ciphertext)
     cipher_aes = AES.new(key, AES.MODE_EAX, msg_nonce)
     plaintext = cipher_aes.decrypt_and_verify(ciphertext, tag)
     return plaintext
@@ -107,15 +111,14 @@ def parseNewSecretMessage(msg_content):
 
 def parseTextMessage(msg_content):
     msg_body = msg_content[2:-256]
-    plaintext = decrypt_AES(msg_content, session_key)
-    return plaintext
+    plaintext = decrypt_AES(msg_body, session_key)
+    return plaintext.decode('ascii')
 
 ''' HIGH LEVEL API '''
 signature_length = 256
-def receiveAndParseMessage(message):
+def receiveAndParseMessage(message): # Make this just a fixed thing
 	msg_type = int(message[0:1].decode('ascii'))
 	msg_address = message[1:2].decode('ascii')
-	msg_content = message[2:-signature_length].decode('ascii')
 	signature = message[-signature_length:]
 	msg_public_key = getPublicKey(msg_address)
 
@@ -133,7 +136,7 @@ def receiveAndParseMessage(message):
 		ret = generateSharedSecretDictMessage(message) # Return a message of shared secret dict
 	elif (msg_type == 3): # New shared secret message
 		print ("Message type 3")
-		ret = parseNewSecretMessage(msg_content) # Don't return anything
+		ret = parseNewSecretMessage(message[2:-signature_length].decode('ascii'))
 	elif (msg_type == 4): # Leave message
 		print ("Message type 4")
 		# Do nothing because the client should never receive this type of message
@@ -186,13 +189,10 @@ def generateTextMessage(plaintext):
 	message = msg_type + sent_from + msg_body
 
 	signature = sign(message, private_key)
-	print('ciphertext: ', ciphertext)
-	print('tag: ', tag)
+
 	return message + signature
 
 
-public_key, private_key = generateUserKeys()
+public_key = getPublicKey('A')
+private_key = get_private_key('A')
 session_key = get_random_bytes(16)
-d = generateSharedSecretDictMessage([public_key])
-# print(d)
-receiveAndParseMessage(d)
