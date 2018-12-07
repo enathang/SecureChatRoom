@@ -55,16 +55,19 @@ def decrypt_AES(message, key):
     return plaintext
 
 
-def generateSharedSecretDict(users_publickeys, session_key):
-	secrets_dict = dict()
+def generateSharedSecretDict(user_list, session_key):
+    secrets_dict = dict()
 
-	for user_publickey in users_publickeys:
-		user_key = user_publickey
-		cipher_rsa = PKCS1_OAEP.new(user_key)
-		enc_session_key = cipher_rsa.encrypt(session_key)
-		secrets_dict[str(user_publickey.export_key())] = b64encode(enc_session_key).decode('utf-8')
+    for usr in user_list:
 
-	return secrets_dict
+        with open('./keys/' + usr +'_pub.pem', 'r') as usr_kfile:
+            usr_kstr = usr_kfile.read()
+            user_key = RSA.import_key(usr_kstr)
+            cipher_rsa = PKCS1_OAEP.new(user_key)
+            enc_session_key = cipher_rsa.encrypt(session_key)
+            secrets_dict[usr] = b64encode(enc_session_key).decode('utf-8')
+
+    return secrets_dict
 
 
 def verifySignature(message, signature, key):
@@ -80,7 +83,7 @@ def verifySignature(message, signature, key):
 
 
 def parseSharedSecretDict(secrets_dict):
-	enc_session_key = b64decode(secrets_dict[str(public_key.export_key())].encode('utf-8'))
+	enc_session_key = b64decode(secrets_dict[address]).encode('utf-8')
 	cipher_rsa = PKCS1_OAEP.new(private_key)
 	session_key = cipher_rsa.decrypt(enc_session_key)
 
@@ -97,9 +100,9 @@ def generateUserKeys():
 	return public_key, private_key
 
 
-def establishSharedSecret(users_publickeys):
+def establishSharedSecret(users_list):
 	session_key = get_random_bytes(16)
-	secret_dictionary = generateSharedSecretDict(users_publickeys, session_key)
+	secret_dictionary = generateSharedSecretDict(users_list, session_key)
 	json_secret_dictionary = json.dumps(secret_dictionary)
 
 	return session_key, json_secret_dictionary
@@ -130,19 +133,19 @@ def receiveAndParseMessage(message): # Make this just a fixed thing
 
 	ret = ""
 	if (msg_type == MsgType.JOIN): # Join message
-		print ("Message type 1")
+		print ("Message type JOIN")
 		# Do nothing because the client should never receive this type of message
 	elif (msg_type == MsgType.INIT): # Init message
-		print ("Message type 2")
-		ret = generateSharedSecretDictMessage(message) # Return a message of shared secret dict
+		print ("Message type INIT")
+		ret = generateSharedSecretDictMessage() # Return a message of shared secret dict
 	elif (msg_type == MsgType.SECRET): # New shared secret message
-		print ("Message type 3")
+		print ("Message type SECRET")
 		ret = parseNewSecretMessage(message[2:-signature_length].decode('ascii'))
 	elif (msg_type == MsgType.LEAVE): # Leave message
-		print ("Message type 4")
+		print ("Message type LEAVE")
 		# Do nothing because the client should never receive this type of message
 	elif (msg_type == MsgType.MSG): # Encrypted text message
-		print ("Message type 5")
+		print ("Message type MSG")
 		ret = parseTextMessage(message) # Return plaintext
 	else:
 		print ("Unrecognized message type: " + str(msg_type))
@@ -156,14 +159,13 @@ def generateJoinMessage():
 	message = msg_type + sent_from
 
 	signature = sign(message, private_key)
-
 	return message + signature
 
 
-def generateSharedSecretDictMessage(receipients):
+def generateSharedSecretDictMessage():
 	msg_type = str(int(MsgType.SECRET)).encode('ascii')
 	sent_from = address.encode('ascii')
-	secret, json_dict = establishSharedSecret(receipients) # Note dict is sent unencrypted
+	secret, json_dict = establishSharedSecret('ABCDE') # Note dict is sent unencrypted
 	message = msg_type + sent_from + json_dict.encode('ascii')
 
 	signature = sign(message, private_key)
@@ -190,7 +192,7 @@ def generateTextMessage(plaintext):
 	message = msg_type + sent_from + msg_body
 
 	signature = sign(message, private_key)
-
+	print('Sending message: \n', message)
 	return message + signature
 
 

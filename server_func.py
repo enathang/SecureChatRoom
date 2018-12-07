@@ -1,7 +1,6 @@
 from Crypto.Random import get_random_bytes
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import AES, PKCS1_OAEP
-from Crypto.Signature import pkcs1_15
 from Crypto.Signature import PKCS1_PSS
 from Crypto.Hash import SHA256
 from enum import Enum
@@ -9,6 +8,7 @@ import sys
 
 from netinterface import network_interface
 from chat_protocol import MsgType
+from chat_protocol import MSG_SIGNATURE_SIZE
 import chat_protocol
 import random
 
@@ -47,13 +47,14 @@ class Server:
         if not self.validate(msg):
             print('Message did not validate correctly.', file=sys.stderr)
             return
-        msg_source = msg[1:2].encode('ascii')[0]
+
+        msg_source = msg[1:2].encode('ascii')[0] if type(msg) != bytes else msg[1:2]
         try:
             opts  = {
-                MsgType.JOIN       : response_join,
-                MsgType.LEAVE      : response_leave,
-                MsgType.MESSAGE    : response_msg,
-                MsgType.SECRET     : response_secret
+                MsgType.JOIN       : self.response_join,
+                MsgType.LEAVE      : self.response_leave,
+                MsgType.MSG        : self.response_msg,
+                MsgType.SECRET     : self.response_secret
                 }[msg_type](msg, msg_source)
         except KeyError:
             print('Invalid msg_type received. Dropping message.', file=sys.stderr)
@@ -65,14 +66,17 @@ class Server:
         self.state = ServerState.UNINITIALIZED
 
     def validate(self, msg):
-        print('Validating msg...')
+        return True # TODO fix this
+        print('Validating msg...\n', msg[:-MSG_SIGNATURE_SIZE])
         try:
-            usr = msg[1:2]
-            with open(usr +'_pub.pem', r) as usr_kfile:
+            usr = msg[1:2].decode('ascii')
+            with open('./keys/' + usr +'_pub.pem', 'r') as usr_kfile:
                 usr_kstr = usr_kfile.read()
-                usr_sig = msg[-SIGNATURE_SIZE:]
-                verify_signature(msg[:-SIGNATURE_SIZE], usr_sig, usr_kstr)
-        except:
+                usr_key = RSA.import_key(usr_kstr)
+
+                usr_sig = msg[-MSG_SIGNATURE_SIZE:]
+                verify_signature(msg[:-MSG_SIGNATURE_SIZE], usr_sig, usr_key)
+        except KeyError:
             return False
 
     def response_join(self, msg, msg_source):
@@ -105,13 +109,13 @@ class Server:
         dest_addresses = ''.join(
             [dest for dest in self.group_members if self.group_members[dest]]
             )
-        self.send_msg(msg, data_addresses)
+        self.send_msg(msg, dest_addresses)
 
     def send_msg(self, msg, data_addresses):
-        print('Sending message to ', data_addresses.decode())
+        print('Sending message to ', data_addresses)
         # Below commented line if we want server wrapping messages with its own addr/sig combo
         #msg = self.format_msg(msg)
-        self.netif.send_msg(data_addresses.decode(), msg)
+        self.netif.send_msg(data_addresses, msg)
 
     def format_msg(self, msg):
         msg = msg + SERVER_ADDR
@@ -123,14 +127,15 @@ class Server:
     def send_init(self, usr):
 #        msg_type = bytes([MsgType.INIT])
         print('Received msg from', usr, 'Sending init...\n')
-        msg_type = str(MsgType.INIT).encode('ascii')
-        msg = format_msg(self, msg)
-        self.send_msg(self, msg, usr)
+        msg_type = str(int(MsgType.INIT)).encode('ascii')
+        msg = self.format_msg(msg_type)
+        self.send_msg(msg, usr)
 
-def verify_signature(self, message, signature, key):
+def verify_signature(message, signature, key):
         h = SHA256.new(message)
+        print(key)
         try:
-            PKCS1_PSS.new(k).verify(h, signature)
+            PKCS1_PSS.new(key).verify(h, signature)
             return True
         except (ValueError, TypeError):
             return False

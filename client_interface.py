@@ -66,7 +66,7 @@ netif = network_interface(NET_PATH, OWN_ADDR)
 ## send join, recieve init, and generate new secret
 join_msg = user.generateJoinMessage()
 netif.send_msg('S', join_msg)
-status, respond_msg = netif.receive_msg(blocking=False)
+status, respond_msg = netif.receive_msg(blocking=True)
 if not status:
 	print('no response from the server, exiting')
 	quit()
