@@ -13,7 +13,11 @@ shared_secret = -1
 USER_MODE = "RSA"
 counter = 0
 address = "A";
+global session_key
+session_key = b''
 
+def init_user(addr):
+	address = addr
 
 def sign(message, private_key):
 	h = SHA256.new(message)
@@ -55,7 +59,7 @@ def decrypt_AES(message, key):
     return plaintext
 
 
-def generateSharedSecretDict(user_list, session_key):
+def generateSharedSecretDict(user_list):
     secrets_dict = dict()
 
     for usr in user_list:
@@ -101,11 +105,13 @@ def generateUserKeys():
 
 
 def establishSharedSecret(users_list):
-	session_key = get_random_bytes(16)
-	secret_dictionary = generateSharedSecretDict(users_list, session_key)
-	json_secret_dictionary = json.dumps(secret_dictionary)
+    print('establishin...')
+    global session_key
+    session_key = get_random_bytes(16)
+    secret_dictionary = generateSharedSecretDict(users_list)
+    json_secret_dictionary = json.dumps(secret_dictionary)
 
-	return session_key, json_secret_dictionary
+    return session_key, json_secret_dictionary
 
 
 def parseNewSecretMessage(msg_content):
@@ -196,6 +202,6 @@ def generateTextMessage(plaintext):
 	return message + signature
 
 
-public_key = getPublicKey('A')
-private_key = get_private_key('A')
-session_key = get_random_bytes(16)
+public_key = getPublicKey(address)
+private_key = get_private_key(address)
+# session_key = get_random_bytes(16)

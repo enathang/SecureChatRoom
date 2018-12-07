@@ -114,7 +114,8 @@ class Server:
     def send_msg(self, msg, data_addresses):
         print('Sending message to ', data_addresses)
         # Below commented line if we want server wrapping messages with its own addr/sig combo
-        #msg = self.format_msg(msg)
+        msg = self.format_msg(msg)
+        data_addresses = data_addresses.decode() if type(data_addresses) == bytes else data_addresses
         self.netif.send_msg(data_addresses, msg)
 
     def format_msg(self, msg):
