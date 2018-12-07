@@ -252,7 +252,7 @@ def generateTextMessage(plaintext):
 	msg_type = "5".encode('ascii')
 	sent_from = address.encode('ascii')
 	ciphertext, msg_nonce, tag = encrypt_AES(plaintext, shared_secret)
-    msg_body = ciphertext + msg_nonce + tag
+	msg_body = ciphertext + msg_nonce + tag
 	message = msg_type + sent_from + msg_body
 
 	signature = sign(message, private_key)
