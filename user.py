@@ -104,6 +104,13 @@ def encrypt_AES(message, key):
 
     return ciphertext, cipher_aes.nonce, tag
 
+def getPublicKey(address):
+	key_file = address+"_PK.pem"
+	with open(key_file) as f:
+		key = RSA.import_key(f.read())
+
+	return key
+
 
 def decrypt_AES(message, key):
     tag = message[-16:]
@@ -190,8 +197,9 @@ def receiveAndParseMessage(message):
 	msg_address = message[1:2].decode('ascii')
 	msg_content = message[2:-signature_length].decode('ascii')
 	signature = message[-signature_length:]
+	msg_public_key = getPublicKey(msg_address)
 
-	isValidSignature = verifySignature(message[0:-signature_length], signature, public_key) # shoud be address
+	isValidSignature = verifySignature(message[0:-signature_length], signature, msg_public_key) # shoud be address
 	if (not isValidSignature):
 		return -1, ""
 
