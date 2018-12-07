@@ -42,7 +42,7 @@ class Server:
         except ValueError:
             print('Invalid msg_type received. Dropping message.', file=sys.stderr)
             return
-        if not validate(msg):
+        if not self.validate(msg):
             print('Message did not validate correctly.', file=sys.stderr)
             return
         msg_source = msg[1:2].encode('ascii')[0]
@@ -73,7 +73,7 @@ class Server:
             return False
 
     def response_join(self, msg, msg_source):
-        send_init(msg_source)
+        self.send_init(msg_source)
 
     def response_leave(self, msg, msg_source):
         # We already have verified that the user exists (so no need to check for KeyError)
@@ -82,22 +82,22 @@ class Server:
             if(reduce( lambda x, y: self.group_members[x] and self.group_members[y]), self.group_members):
                 self.destroy()
             new_initiator = random.choice(list(self.group_members))
-            send_init(new_initiator)
+            self.send_init(new_initiator)
         except KeyError:
             print('key error in leave response -- specified group member not found!', file=sys.stderr)
             return
 
     def response_msg(self, msg, msg_source):
-        forward_msg(msg, msg_source)
+        self.forward_msg(msg, msg_source)
 
     def response_secret(self, msg, msg_source):
-        forward_msg(msg, msg_source)
+        self.forward_msg(msg, msg_source)
 
     def forward_msg(self, msg, msg_source):
         dest_addresses = ''.join(
             [dest for dest in self.group_members if self.group_members[dest]]
             )
-        send_msg(msg, data_addresses)
+        self.send_msg(msg, data_addresses)
 
     def send_msg(self, msg, data_addresses):
         # Below commented line if we want server wrapping messages with its own addr/sig combo
@@ -115,7 +115,7 @@ class Server:
 #        msg_type = bytes([MsgType.INIT])
         msg_type = str(MsgType.INIT).encode('ascii')
         msg = format_msg(self, msg)
-        send_msg(self, msg, usr)
+        self.send_msg(self, msg, usr)
 
 def verify_signature(self, message, signature, key):
         h = SHA256.new(message)
