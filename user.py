@@ -12,12 +12,14 @@ from base64 import b64decode, b64encode
 shared_secret = -1
 USER_MODE = "RSA"
 counter = 0
+global address
 address = "A";
 global session_key
 session_key = b''
 
 def init_user(addr):
-	address = addr
+    global address
+    address = addr
 
 def sign(message, private_key):
 	h = SHA256.new(message)
@@ -127,6 +129,7 @@ def parseTextMessage(msg_content):
 ''' HIGH LEVEL API '''
 signature_length = 256
 def receiveAndParseMessage(message): # Make this just a fixed thing
+	print('Received and parsing message: ', message)
 	msg_type = int(message[0:1].decode('ascii'))
 	msg_address = message[1:2].decode('ascii')
 	signature = message[-signature_length:]

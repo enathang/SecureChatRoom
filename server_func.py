@@ -21,7 +21,7 @@ class Server:
     def __init__(self, netif, group_members_fname, keyfile):
         # Read in all group members, and set them to be offline
         self.group_members = {}
-        with open(group_members_fname, 'rb') as f:
+        with open(group_members_fname, 'r') as f:
             for line in f:
                 self.group_members[line.strip()] = False
         with open(keyfile, 'r') as kfile:
@@ -38,9 +38,10 @@ class Server:
             self.evaluate_msg(msg)
 
     def evaluate_msg(self, msg):
-        print('Evaluating msg...')
+        print('Evaluating msg...',)
         try:
             msg_type = int(msg[:chat_protocol.MSG_TYPE_SIZE])
+            print('Message type: ', msg_type)
         except ValueError:
             print('Invalid msg_type received. Dropping message.', file=sys.stderr)
             return
@@ -81,6 +82,7 @@ class Server:
 
     def response_join(self, msg, msg_source):
         print('Responding to join message...')
+        self.group_members[msg_source.decode()] = True
         self.send_init(msg_source)
 
     def response_leave(self, msg, msg_source):
@@ -106,10 +108,14 @@ class Server:
 
     def forward_msg(self, msg, msg_source):
         print('Forwarding message from ', msg_source)
-        dest_addresses = ''.join(
-            [dest for dest in self.group_members if self.group_members[dest]]
-            )
-        self.send_msg(msg, dest_addresses)
+        try:
+            dest_addresses = ''.join(
+                [dest for dest in self.group_members if self.group_members[dest] and dest != msg_source.decode()]
+                )
+            self.send_msg(msg, dest_addresses)
+        except:
+            print('Client not found, message not forwarded? Client: ', self.group_members)
+
 
     def send_msg(self, msg, data_addresses):
         print('Sending message to ', data_addresses)

@@ -25,7 +25,7 @@ NET_PATH = './'
 OWN_ADDR = 'A'
 SERVER = 'S'
 
-# ------------       
+# ------------
 # main program
 # ------------
 
@@ -59,7 +59,7 @@ if OWN_ADDR not in network_interface.addr_space:
 user.init_user(OWN_ADDR)
 
 
-# start main loop 
+# start main loop
 netif = network_interface(NET_PATH, OWN_ADDR)
 
 
@@ -80,19 +80,19 @@ print('join protocol finished')
 
 ## gui
 def gui_send(event = None):
-	
+
 	msg_list.insert(tkinter.END, 'you: ' + my_msg.get())
 	plain_msg = my_msg.get()
 	enc_msg = user.generateTextMessage(plain_msg)
 	my_msg.set('')
 	## send actually send a message.
 	netif.send_msg('S', enc_msg)
-	
+
 
 
 def gui_recieve():
 	while True:
-		msg = netif.receive_msg(blocking=True)
+		status, msg = netif.receive_msg(blocking=True)
 		msg_type, parsed_msg = user.receiveAndParseMessage(msg)
 		if msg_type == '2':
     			netif.send_msg('S', parsed_msg)
@@ -135,9 +135,3 @@ receive_thread = Thread(target=gui_recieve)
 receive_thread.start()
 
 tkinter.mainloop()  # Starts GUI execution.
-
-
-
-
-
-
