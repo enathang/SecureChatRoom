@@ -133,23 +133,28 @@ class Server:
         '''
         print('Responding to secret message...')
         self.last_secret_hash = SHA256.new(msg).digest()
+        print(self.last_secret_hash)
         self.forward_msg(msg, msg_source)
 
     def response_challenge(self, msg, msg_source):
-        print('Responding to challenge message...')
+        print('Responding to challenge message...', msg)
+        print(msg[2:-MSG_SIGNATURE_SIZE])
         msg_type = str(int(MsgType.CHALLENGE)).encode('ascii')
-        unencrypted_data = user.decrypt_AES(msg[2:-MSG_SIGNATURE_SIZE], user.get_private_key(SERVER_ADDR.decode()))
+        cipher_rsa = PKCS1_OAEP.new(user.get_private_key(SERVER_ADDR.decode()))
+        unencrypted_data = cipher_rsa.decrypt(msg[2:-MSG_SIGNATURE_SIZE])
         unencrypted_nonce = unencrypted_data[:16]
         msg_hash_to_verify = unencrypted_data[16:]
         if msg_hash_to_verify != self.last_secret_hash:
             print('Somebody\'s prolly trying to force an old key!')
-            send_msg(msg, msg_source) # Send junk message that will fail
-        reencrypted_data = user.encrypt_AES(unencrypted_nonce, user.getPublicKey(msg_source.decode()))
+            self.send_msg(msg, msg_source) # Send junk message that will fail
+
+        cipher_rsa_usr = PKCS1_OAEP.new(user.getPublicKey(msg_source.decode()))
+        reencrypted_data = cipher_rsa_usr.encrypt(unencrypted_nonce)
         msg = msg_type + SERVER_ADDR + reencrypted_data
         hash = SHA256.new(msg)
         sig = self.dig_signer.sign(hash)
         msg += sig
-        send_msg(msg, msg_source)
+        self.send_msg(msg, msg_source)
 
     def forward_msg(self, msg, msg_source):
         print('Forwarding message from ', msg_source)

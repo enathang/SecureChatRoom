@@ -5,6 +5,7 @@ from Crypto.Signature import PKCS1_PSS
 from Crypto.Hash import SHA256
 from chat_protocol import MsgType
 from pathlib import Path
+from netinterface import network_interface
 
 import os
 import json
@@ -19,9 +20,19 @@ address = "A";
 global session_key
 session_key = b''
 
+global private_key
+global public_key
+global _netif
+
 def init_user(addr):
     global address
+    global private_key
+    global public_key
+    global _netif
     address = addr
+    public_key = getPublicKey(addr)
+    private_key = get_private_key(addr)
+    _netif = network_interface('./', address)
 
 def sign(message, private_key):
 	h = SHA256.new(message)
@@ -31,8 +42,8 @@ def sign(message, private_key):
 
 
 def encrypt_AES(message, key):
-	if(key == -1):
-		print('Cannot encrypt text before shared secret is established.')
+	#if(key == -1):
+	#	print('Cannot encrypt text before shared secret is established.')
 	cipher_aes = AES.new(key, AES.MODE_EAX)
 	ciphertext, tag = cipher_aes.encrypt_and_digest(message)
 	return ciphertext, cipher_aes.nonce, tag
@@ -52,12 +63,12 @@ def get_private_key(address):
 	return key
 
 def decrypt_AES(message, key):
-	if(key == -1):
-		print('Cannot encrypt text before shared secret is established.')
+	#if(key == -1):
+	#	print('Cannot encrypt text before shared secret is established.')
 	tag = message[-16:]
 	msg_nonce = message[-32:-16]
 	ciphertext = message[:-32]
-#DEBUG    print('tag: ', tag, '\nnonce: ', msg_nonce, '\nciphertext: ', ciphertext)
+	print('tag: ', tag, '\nnonce: ', msg_nonce, '\nciphertext: ', ciphertext)
 	cipher_aes = AES.new(key, AES.MODE_EAX, msg_nonce)
 	plaintext = cipher_aes.decrypt_and_verify(ciphertext, tag)
 	return plaintext
@@ -73,7 +84,6 @@ def generateSharedSecretDict(user_list):
             cipher_rsa = PKCS1_OAEP.new(user_key)
             enc_session_key = cipher_rsa.encrypt(session_key)
             secrets_dict[usr] = b64encode(enc_session_key).decode('ascii')
-
     return secrets_dict
 
 
@@ -87,7 +97,6 @@ def generateSharedSecretString(user_list):
 			cipher_rsa = PKCS1_OAEP.new(user_key)
 			enc_session_key = cipher_rsa.encrypt(session_key)
 			byte_str += enc_session_key
-
 	return byte_str
 
 
@@ -110,7 +119,6 @@ def parseSharedSecretString(msg):
 	enc_session_key = msg[5+user_index*256:5+(user_index+1)*256]
 	cipher_rsa = PKCS1_OAEP.new(private_key)
 	session_key = cipher_rsa.decrypt(enc_session_key)
-
 	return session_key
 
 
@@ -118,7 +126,6 @@ def parseSharedSecretDict(secrets_dict):
 	enc_session_key = b64decode(secrets_dict[address].encode('ascii'))
 	cipher_rsa = PKCS1_OAEP.new(private_key)
 	session_key = cipher_rsa.decrypt(enc_session_key)
-
 	return session_key
 
 
@@ -143,8 +150,9 @@ def establishSharedSecretString(user_list):
 
 
 def parseNewSecretMessage(msg_content):
-	shared_secret = parseSharedSecretString(msg_content)
-
+    if verify_message_freshness(msg_content):
+        print('verified correctly.')
+        shared_secret = parseSharedSecretString(msg_content[2:-signature_length])
 
 def parseTextMessage(msg_content):
 	msg_body = msg_content[2:-signature_length]
@@ -174,7 +182,7 @@ def receiveAndParseMessage(message): # Make this just a fixed thing
 		ret = generateSharedSecretDictMessage() # Return a message of shared secret dict
 	elif (msg_type == MsgType.SECRET): # New shared secret message
 		print ("Message type SECRET")
-		ret = parseNewSecretMessage(message[2:-signature_length])
+		ret = parseNewSecretMessage(message)
 	elif (msg_type == MsgType.LEAVE): # Leave message
 		print ("Message type LEAVE")
 		# Do nothing because the client should never receive this type of message
@@ -195,18 +203,21 @@ def generateJoinMessage():
 	signature = sign(message, private_key)
 	return message + signature
 
-'''
-netif = network_interface(NET_PATH, OWN_ADDR)
+
+
 def verify_message_freshness(test_msg):
+    print('verifyin secret freshness')
     msg, nonce = generateChallengeMessage(test_msg)
-    netif.send(msg, 'S')
+    _netif.send_msg('S', msg)
 
     # Drop racey messages
-    response = netif.receive_msg(blocking=True)
-    while(response[1] != MsgType.CHALLENGE):
-        response = netif.receive_msg(blocking=True)
-    return challege_response_verify(response, nonce)
+    status, response = _netif.receive_msg(blocking=True)
+    while(response[0] != ord(str(int(MsgType.CHALLENGE)).encode('ascii'))):
+        status, response = _netif.receive_msg(blocking=True)
+    return challenge_response_verify(response, nonce)
+
 def generateChallengeMessage(msg):
+    print('generatin challenge message')
     hash = SHA256.new(msg).digest()
 
     msg_type = str(int(MsgType.CHALLENGE)).encode('ascii')
@@ -214,19 +225,21 @@ def generateChallengeMessage(msg):
     nonce = get_random_bytes(16)
 
     cipher = PKCS1_OAEP.new(getPublicKey('S'))
-    cipher.encrypt(nonce+hash)
-
+    message_body = cipher.encrypt(nonce+hash)
+    message = str(int(MsgType.CHALLENGE)).encode('ascii') + address.encode('ascii') + message_body
     signature = sign(message, private_key)
     return message + signature, nonce
 
 def challenge_response_verify(message, expected_nonce):
+        print('verifyin challenge response')
         if verifySignature(message[:-signature_length], message[-signature_length], getPublicKey('S')):
-            msg_body = msg_content[2:-256]
-            plaintext = decrypt_AES(msg_body, session_key)
-            if(plaintext[msg_body] == expected_nonce):
+            msg_body = message[2:-256]
+            cipher = PKCS1_OAEP.new(private_key)
+            plaintext = cipher.decrypt(msg_body)
+            if(plaintext == expected_nonce):
                 return True
         return False
-'''
+
 def generateSharedSecretDictMessage():
 	msg_type = str(int(MsgType.SECRET)).encode('ascii')
 	sent_from = address.encode('ascii')
@@ -234,7 +247,6 @@ def generateSharedSecretDictMessage():
 	message = msg_type + sent_from + string
 
 	signature = sign(message, private_key)
-	print ()
 
 	return message + signature
 
@@ -260,7 +272,3 @@ def generateTextMessage(plaintext):
 	signature = sign(message, private_key)
 	print('Sending message: \n', message+signature)
 	return message + signature
-
-
-public_key = getPublicKey(address)
-private_key = get_private_key(address)

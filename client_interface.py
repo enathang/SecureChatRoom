@@ -94,11 +94,15 @@ def gui_recieve():
 	while True:
 		status, msg = netif.receive_msg(blocking=True)
 		msg_type, parsed_msg = user.receiveAndParseMessage(msg)
-		if msg_type == '2':
+		if msg_type == '1':
     			netif.send_msg('S', parsed_msg)
-		else:
+		else:#
+			if msg_type == '2':
+				return
 			text_msg = parsed_msg
 			if msg and text_msg:
+					msg = msg if type(type) != bytes else msg.decode()
+					text_msg = text_msg if type(text_msg) != bytes else text_msg.decode()
 					msg_list.insert(tkinter.END, chr(msg[1]) + ': ' + text_msg)
 
 
