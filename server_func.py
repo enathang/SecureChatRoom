@@ -5,7 +5,7 @@ from Crypto.Signature import PKCS1_PSS
 from Crypto.Hash import SHA256
 from enum import Enum
 import sys
-#import user
+import user
 
 from netinterface import network_interface
 from chat_protocol import MsgType
@@ -31,7 +31,7 @@ class Server:
             self.dig_signer = PKCS1_PSS.new(self.key_pair)
         #self.state = self.ServerState.UNINITIALIZED
         self.netif = netif
-
+        self.last_secret_hash = None
     def listen(self):
         while True:
             print('Waiting for msg...')
@@ -57,7 +57,7 @@ class Server:
                 MsgType.LEAVE      : self.response_leave,
                 MsgType.MSG        : self.response_msg,
                 MsgType.SECRET     : self.response_secret,
-                #MsgType.CHALLENGE  : self.response_challenge
+                MsgType.CHALLENGE  : self.response_challenge
                 }[msg_type](msg, msg_source)
         except KeyError:
             print('Invalid msg_type received. Dropping message.', file=sys.stderr)
@@ -132,19 +132,24 @@ class Server:
             Path('./dirty').touch(exist_ok = True)
         '''
         print('Responding to secret message...')
-
+        self.last_secret_hash = SHA256.new(msg).digest()
         self.forward_msg(msg, msg_source)
 
-        '''
     def response_challenge(self, msg, msg_source):
         print('Responding to challenge message...')
         msg_type = str(int(MsgType.CHALLENGE)).encode('ascii')
-        unencrypted_nonce = user.decrypt_AES(msg[2:-MSG_SIGNATURE_SIZE], user.get_private_key(SERVER_ADDR.decode()))
-        msg = msg_type + SERVER_ADDR + unencrypted_nonce
+        unencrypted_data = user.decrypt_AES(msg[2:-MSG_SIGNATURE_SIZE], user.get_private_key(SERVER_ADDR.decode()))
+        unencrypted_nonce = unencrypted_data[:16]
+        msg_hash_to_verify = unencrypted_data[16:]
+        if msg_hash_to_verify != self.last_secret_hash:
+            print('Somebody\'s prolly trying to force an old key!')
+            send_msg(msg, msg_source) # Send junk message that will fail
+        reencrypted_data = user.encrypt_AES(unencrypted_nonce, user.getPublicKey(msg_source.decode()))
+        msg = msg_type + SERVER_ADDR + reencrypted_data
         hash = SHA256.new(msg)
         sig = self.dig_signer.sign(hash)
+        msg += sig
         send_msg(msg, msg_source)
-        '''
 
     def forward_msg(self, msg, msg_source):
         print('Forwarding message from ', msg_source)

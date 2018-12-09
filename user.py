@@ -174,20 +174,36 @@ def generateJoinMessage():
 	return message + signature
 
 '''
-def generateChallengeMessage():
+netif = network_interface(NET_PATH, OWN_ADDR)
+def verify_message_freshness(test_msg):
+    msg, nonce = generateChallengeMessage(test_msg)
+    netif.send(msg, 'S')
+
+    # Drop racey messages
+    response = netif.receive_msg(blocking=True)
+    while(response[1] != MsgType.CHALLENGE):
+        response = netif.receive_msg(blocking=True)
+    return challege_response_verify(response, nonce)
+def generateChallengeMessage(msg):
+    hash = SHA256.new(msg).digest()
+
     msg_type = str(int(MsgType.CHALLENGE)).encode('ascii')
     sent_from = address.encode('ascii')
     nonce = get_random_bytes(16)
-    set_challenge_info(nonce)
 
     cipher = PKCS1_OAEP.new(getPublicKey('S'))
-    cipher.encrypt(nonce)
+    cipher.encrypt(nonce+hash)
 
     signature = sign(message, private_key)
-    return message + signature
+    return message + signature, nonce
 
-def parseChallengeResponse():
-    if(nonce == get_challenge_nonce())
+def challenge_response_verify(message, expected_nonce):
+        if verifySignature(message[:-signature_length], message[-signature_length], getPublicKey('S')):
+            msg_body = msg_content[2:-256]
+            plaintext = decrypt_AES(msg_body, session_key)
+            if(plaintext[msg_body] == expected_nonce):
+                return True
+        return False
 '''
 def generateSharedSecretDictMessage():
 	msg_type = str(int(MsgType.SECRET)).encode('ascii')
