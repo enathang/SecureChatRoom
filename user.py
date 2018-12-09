@@ -31,12 +31,15 @@ def sign(message, private_key):
 
 
 def encrypt_AES(message, key):
-    if(key == -1):
-        print('Cannot encrypt text before shared secret is established.')
-    cipher_aes = AES.new(key, AES.MODE_EAX)
-    ciphertext, tag = cipher_aes.encrypt_and_digest(message)
-    print('encrypted to: ', ciphertext)
-    return ciphertext, cipher_aes.nonce, tag
+	if(key == -1):
+		print('Cannot encrypt text before shared secret is established.')
+	cipher_aes = AES.new(key, AES.MODE_EAX)
+	ciphertext, tag = cipher_aes.encrypt_and_digest(message)
+	print ("AES ENCYPT CIPHER")
+	print (ciphertext)
+	print ("AES ENCRYPT TAG")
+	print (tag)
+	return ciphertext, cipher_aes.nonce, tag
 
 
 def getPublicKey(address):
@@ -53,15 +56,19 @@ def get_private_key(address):
 	return key
 
 def decrypt_AES(message, key):
-    if(key == -1):
-        print('Cannot encrypt text before shared secret is established.')
-    tag = message[-16:]
-    msg_nonce = message[-32:-16]
-    ciphertext = message[:-32]
-    print('tag: ', tag, '\nnonce: ', msg_nonce, '\nciphertext: ', ciphertext)
-    cipher_aes = AES.new(key, AES.MODE_EAX, msg_nonce)
-    plaintext = cipher_aes.decrypt_and_verify(ciphertext, tag)
-    return plaintext
+	if(key == -1):
+		print('Cannot encrypt text before shared secret is established.')
+	tag = message[-16:]
+	msg_nonce = message[-32:-16]
+	ciphertext = message[:-32]
+#DEBUG    print('tag: ', tag, '\nnonce: ', msg_nonce, '\nciphertext: ', ciphertext)
+	cipher_aes = AES.new(key, AES.MODE_EAX, msg_nonce)
+	print ("AES DECRYPT CIPHER")
+	print (ciphertext)
+	print ("AES DECRYPT TAG")
+	print (tag)
+	plaintext = cipher_aes.decrypt_and_verify(ciphertext, tag)
+	return plaintext
 
 
 def generateSharedSecretDict(user_list):
@@ -78,6 +85,20 @@ def generateSharedSecretDict(user_list):
     return secrets_dict
 
 
+def generateSharedSecretString(user_list):
+	byte_str = b""
+
+	for usr in user_list:
+		with open('./keys/' + usr +'_pub.pem', 'r') as usr_kfile:
+			usr_kstr = usr_kfile.read()
+			user_key = RSA.import_key(usr_kstr)
+			cipher_rsa = PKCS1_OAEP.new(user_key)
+			enc_session_key = cipher_rsa.encrypt(session_key)
+			byte_str += enc_session_key
+
+	return byte_str
+
+
 def verifySignature(message, signature, key):
 	h = SHA256.new(message)
 	try:
@@ -89,6 +110,19 @@ def verifySignature(message, signature, key):
 	 	return False
 
 
+def parseSharedSecretString(msg):
+	global session_key
+	user_order = msg[0:5].decode('ascii')
+	user_index = user_order.index(address)
+
+	enc_session_key = msg[5+user_index*256:5+(user_index+1)*256]
+	cipher_rsa = PKCS1_OAEP.new(private_key)
+	session_key = cipher_rsa.decrypt(enc_session_key)
+	print ("SESSION KEY DECRYPTED")
+	print (session_key)
+
+	return session_key
+
 
 def parseSharedSecretDict(secrets_dict):
 	enc_session_key = b64decode(secrets_dict[address].encode('ascii'))
@@ -96,16 +130,6 @@ def parseSharedSecretDict(secrets_dict):
 	session_key = cipher_rsa.decrypt(enc_session_key)
 
 	return session_key
-
-
-def generateUserKeys():
-	key = RSA.generate(2048)
-	private_key_object = key.export_key()
-	public_key_object = key.publickey().export_key()
-	public_key = RSA.import_key(public_key_object)
-	private_key = RSA.import_key(private_key_object)
-
-	return public_key, private_key
 
 
 def establishSharedSecret(users_list):
@@ -118,16 +142,32 @@ def establishSharedSecret(users_list):
 
     return session_key, json_secret_dictionary
 
+def establishSharedSecretString(user_list):
+    print('establishin...')
+    global session_key
+    session_key = get_random_bytes(16)
+    print ("SESSION KEY SEND")
+    print (session_key)
+    secret_string = generateSharedSecretString(user_list)
+    print ("ESTABLISH")
+    print (secret_string)
+    user_list_bytes = user_list.encode('ascii')
+
+    return session_key, user_list_bytes+secret_string
+
 
 def parseNewSecretMessage(msg_content):
-	secrets_dict = json.loads(msg_content.decode('utf-8'))
-	shared_secret = parseSharedSecretDict(secrets_dict)
+	print ("PARSE")
+	print (msg_content)
+	shared_secret = parseSharedSecretString(msg_content)
 
 
 def parseTextMessage(msg_content):
-    msg_body = msg_content[2:-256]
-    plaintext = decrypt_AES(msg_body, session_key)
-    return plaintext.decode('ascii')
+	msg_body = msg_content[2:-signature_length]
+	print ("MSG_BODY")
+	print (msg_body)
+	plaintext = decrypt_AES(msg_body, session_key)
+	return plaintext.decode('ascii')
 
 ''' HIGH LEVEL API '''
 signature_length = 256
@@ -139,9 +179,11 @@ def receiveAndParseMessage(message): # Make this just a fixed thing
 	msg_public_key = getPublicKey(msg_address)
 
 	isValidSignature = verifySignature(message[0:-signature_length], signature, msg_public_key) # shoud be address
+	print (msg_address)
+	print (signature)
 	if (not isValidSignature):
 		print ("Is not valid signature")
-		return -1, ""
+		return -1, b""
 
 	ret = ""
 	if (msg_type == MsgType.JOIN): # Join message
@@ -152,7 +194,7 @@ def receiveAndParseMessage(message): # Make this just a fixed thing
 		ret = generateSharedSecretDictMessage() # Return a message of shared secret dict
 	elif (msg_type == MsgType.SECRET): # New shared secret message
 		print ("Message type SECRET")
-		ret = parseNewSecretMessage(b64decode(message[2:-signature_length]).decode('ascii'))
+		ret = parseNewSecretMessage(message[2:-signature_length])
 	elif (msg_type == MsgType.LEAVE): # Leave message
 		print ("Message type LEAVE")
 		# Do nothing because the client should never receive this type of message
@@ -192,10 +234,11 @@ def parseChallengeResponse():
 def generateSharedSecretDictMessage():
 	msg_type = str(int(MsgType.SECRET)).encode('ascii')
 	sent_from = address.encode('ascii')
-	secret, json_dict = establishSharedSecret('ABCDE') # Note dict is sent unencrypted
-	message = msg_type + sent_from + json_dict#.encode('utf-8')
+	secret, string = establishSharedSecretString('ABCDE') # Note dict is sent unencrypted
+	message = msg_type + sent_from + string
 
 	signature = sign(message, private_key)
+	print ()
 
 	return message + signature
 
@@ -219,10 +262,9 @@ def generateTextMessage(plaintext):
 	message = msg_type + sent_from + msg_body
 
 	signature = sign(message, private_key)
-	print('Sending message: \n', message)
+	print('Sending message: \n', message+signature)
 	return message + signature
 
 
 public_key = getPublicKey(address)
 private_key = get_private_key(address)
-session_key = b'0123456789abcdef'#get_random_bytes(16)
