@@ -5,6 +5,7 @@ from Crypto.Signature import PKCS1_PSS
 from Crypto.Hash import SHA256
 from enum import Enum
 import sys
+#import user
 
 from netinterface import network_interface
 from chat_protocol import MsgType
@@ -28,7 +29,7 @@ class Server:
             keystr = kfile.read()
             self.key_pair = RSA.import_key(keystr)
             self.dig_signer = PKCS1_PSS.new(self.key_pair)
-        self.state = self.ServerState.UNINITIALIZED
+        #self.state = self.ServerState.UNINITIALIZED
         self.netif = netif
 
     def listen(self):
@@ -38,7 +39,7 @@ class Server:
             self.evaluate_msg(msg)
 
     def evaluate_msg(self, msg):
-        print('Evaluating msg...',)
+        print('Evaluating msg...', msg)
         try:
             msg_type = int(msg[:chat_protocol.MSG_TYPE_SIZE])
             print('Message type: ', msg_type)
@@ -55,19 +56,20 @@ class Server:
                 MsgType.JOIN       : self.response_join,
                 MsgType.LEAVE      : self.response_leave,
                 MsgType.MSG        : self.response_msg,
-                MsgType.SECRET     : self.response_secret
+                MsgType.SECRET     : self.response_secret,
+                #MsgType.CHALLENGE  : self.response_challenge
                 }[msg_type](msg, msg_source)
         except KeyError:
             print('Invalid msg_type received. Dropping message.', file=sys.stderr)
             return
 
     def destroy(self):
+        print('Server resetting...')
         for usr in self.group_members:
             self.group_members[usr] = False
-        self.state = ServerState.UNINITIALIZED
+        #self.state = ServerState.UNINITIALIZED
 
     def validate(self, msg):
-        return True # TODO fix this
         print('Validating msg...\n', msg[:-MSG_SIGNATURE_SIZE])
         try:
             usr = msg[1:2].decode('ascii')
@@ -77,7 +79,8 @@ class Server:
 
                 usr_sig = msg[-MSG_SIGNATURE_SIZE:]
                 verify_signature(msg[:-MSG_SIGNATURE_SIZE], usr_sig, usr_key)
-        except KeyError:
+                return True
+        except SyntaxError:
             return False
 
     def response_join(self, msg, msg_source):
@@ -90,7 +93,7 @@ class Server:
         # We already have verified that the user exists (so no need to check for KeyError)
         try:
             self.group_members[msg_source] = False
-            if(reduce( lambda x, y: self.group_members[x] and self.group_members[y]), self.group_members):
+            if(len([x for x in self.group_members if self.group_members[x]]) != 0):
                 self.destroy()
             new_initiator = random.choice(list(self.group_members))
             self.send_init(new_initiator)
@@ -103,8 +106,45 @@ class Server:
         self.forward_msg(msg, msg_source)
 
     def response_secret(self, msg, msg_source):
+        '''
+        def is_key_fresh(key):
+            hash = b64encode(SHA256.new(key).digest()).decode()
+            print(hash)
+            if os.path.exists('./dirty/' + hash):
+                folder_time = Path('./dirty/').stat().st_mtime
+                keyfile_time = Path('./dirty/' + hash).stat().st_birthtime
+                print(keyfile_time, '\n', folder_time)
+                # we'll count it as fresh if they happened w/in 5 seconds
+                if(abs(folder_time - keyfile_time) < 1):
+                    return True
+                else:
+                    return False
+            else:
+                 return True
+
+        def make_key_dirty(key):
+            hash = b64encode(SHA256.new(key).digest()).decode()
+            kfilename = './dirty/' + hash
+            try:
+                Path(kfilename).touch(mode=0o000, exist_ok = True)
+            except:
+                print('Key update failed! Key is already dirty.')
+            Path('./dirty').touch(exist_ok = True)
+        '''
         print('Responding to secret message...')
+
         self.forward_msg(msg, msg_source)
+
+        '''
+    def response_challenge(self, msg, msg_source):
+        print('Responding to challenge message...')
+        msg_type = str(int(MsgType.CHALLENGE)).encode('ascii')
+        unencrypted_nonce = user.decrypt_AES(msg[2:-MSG_SIGNATURE_SIZE], user.get_private_key(SERVER_ADDR.decode()))
+        msg = msg_type + SERVER_ADDR + unencrypted_nonce
+        hash = SHA256.new(msg)
+        sig = self.dig_signer.sign(hash)
+        send_msg(msg, msg_source)
+        '''
 
     def forward_msg(self, msg, msg_source):
         print('Forwarding message from ', msg_source)
@@ -118,9 +158,10 @@ class Server:
 
 
     def send_msg(self, msg, data_addresses):
-        print('Sending message to ', data_addresses)
+        print('Sending message to ', data_addresses, '. Message: ', msg)
         # Below commented line if we want server wrapping messages with its own addr/sig combo
-        msg = self.format_msg(msg)
+        #msg = self.format_msg(msg)
+
         data_addresses = data_addresses.decode() if type(data_addresses) == bytes else data_addresses
         self.netif.send_msg(data_addresses, msg)
 
@@ -140,9 +181,9 @@ class Server:
 
 def verify_signature(message, signature, key):
         h = SHA256.new(message)
-        print(key)
+        print(message, key)
         try:
             PKCS1_PSS.new(key).verify(h, signature)
             return True
-        except (ValueError, TypeError):
+        except SyntaxError:
             return False

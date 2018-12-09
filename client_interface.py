@@ -98,7 +98,8 @@ def gui_recieve():
     			netif.send_msg('S', parsed_msg)
 		else:
 			text_msg = parsed_msg
-			msg_list.insert(tkinter.END, text_msg)
+			if msg and text_msg:
+					msg_list.insert(tkinter.END, chr(msg[1]) + ': ' + text_msg)
 
 
 def on_closing(event=None):
