@@ -35,10 +35,6 @@ def encrypt_AES(message, key):
 		print('Cannot encrypt text before shared secret is established.')
 	cipher_aes = AES.new(key, AES.MODE_EAX)
 	ciphertext, tag = cipher_aes.encrypt_and_digest(message)
-	print ("AES ENCYPT CIPHER")
-	print (ciphertext)
-	print ("AES ENCRYPT TAG")
-	print (tag)
 	return ciphertext, cipher_aes.nonce, tag
 
 
@@ -63,10 +59,6 @@ def decrypt_AES(message, key):
 	ciphertext = message[:-32]
 #DEBUG    print('tag: ', tag, '\nnonce: ', msg_nonce, '\nciphertext: ', ciphertext)
 	cipher_aes = AES.new(key, AES.MODE_EAX, msg_nonce)
-	print ("AES DECRYPT CIPHER")
-	print (ciphertext)
-	print ("AES DECRYPT TAG")
-	print (tag)
 	plaintext = cipher_aes.decrypt_and_verify(ciphertext, tag)
 	return plaintext
 
@@ -118,8 +110,6 @@ def parseSharedSecretString(msg):
 	enc_session_key = msg[5+user_index*256:5+(user_index+1)*256]
 	cipher_rsa = PKCS1_OAEP.new(private_key)
 	session_key = cipher_rsa.decrypt(enc_session_key)
-	print ("SESSION KEY DECRYPTED")
-	print (session_key)
 
 	return session_key
 
@@ -146,26 +136,18 @@ def establishSharedSecretString(user_list):
     print('establishin...')
     global session_key
     session_key = get_random_bytes(16)
-    print ("SESSION KEY SEND")
-    print (session_key)
     secret_string = generateSharedSecretString(user_list)
-    print ("ESTABLISH")
-    print (secret_string)
     user_list_bytes = user_list.encode('ascii')
 
     return session_key, user_list_bytes+secret_string
 
 
 def parseNewSecretMessage(msg_content):
-	print ("PARSE")
-	print (msg_content)
 	shared_secret = parseSharedSecretString(msg_content)
 
 
 def parseTextMessage(msg_content):
 	msg_body = msg_content[2:-signature_length]
-	print ("MSG_BODY")
-	print (msg_body)
 	plaintext = decrypt_AES(msg_body, session_key)
 	return plaintext.decode('ascii')
 
@@ -179,8 +161,6 @@ def receiveAndParseMessage(message): # Make this just a fixed thing
 	msg_public_key = getPublicKey(msg_address)
 
 	isValidSignature = verifySignature(message[0:-signature_length], signature, msg_public_key) # shoud be address
-	print (msg_address)
-	print (signature)
 	if (not isValidSignature):
 		print ("Is not valid signature")
 		return -1, b""
