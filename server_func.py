@@ -14,7 +14,7 @@ import chat_protocol
 import random
 
 SERVER_ADDR = b'S'
-
+DIRTY_MSG_FILE = './dirty_msgs'
 class Server:
     class ServerState(Enum):
         UNINITIALIZED = 0
@@ -106,33 +106,14 @@ class Server:
         self.forward_msg(msg, msg_source)
 
     def response_secret(self, msg, msg_source):
-        '''
-        def is_key_fresh(key):
-            hash = b64encode(SHA256.new(key).digest()).decode()
-            print(hash)
-            if os.path.exists('./dirty/' + hash):
-                folder_time = Path('./dirty/').stat().st_mtime
-                keyfile_time = Path('./dirty/' + hash).stat().st_birthtime
-                print(keyfile_time, '\n', folder_time)
-                # we'll count it as fresh if they happened w/in 5 seconds
-                if(abs(folder_time - keyfile_time) < 1):
-                    return True
-                else:
-                    return False
-            else:
-                 return True
-
-        def make_key_dirty(key):
-            hash = b64encode(SHA256.new(key).digest()).decode()
-            kfilename = './dirty/' + hash
-            try:
-                Path(kfilename).touch(mode=0o000, exist_ok = True)
-            except:
-                print('Key update failed! Key is already dirty.')
-            Path('./dirty').touch(exist_ok = True)
-        '''
         print('Responding to secret message...')
         self.last_secret_hash = SHA256.new(msg).digest()
+        with open(DIRTY_MSG_FILE, 'r') as used_file:
+            msg_content = used_file.read()
+            if(msg_content.find(str(self.last_secret_hash)) != -1):
+                return
+        with open(DIRTY_MSG_FILE, 'a') as used_file:
+            used_file.write(str(self.last_secret_hash))
         print(self.last_secret_hash)
         self.forward_msg(msg, msg_source)
 
